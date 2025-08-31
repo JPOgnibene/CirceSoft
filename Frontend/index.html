@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Devcom Mockup</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <header class="header">
+        <div class="icons">
+            <div class="icon">
+                <img id="toggleImage" src="images/websocket_connection_off.png" alt="Websocket Status">
+            </div>
+            <div class="clickIcon">
+                <img src="images/importpathicon.png" alt="Import path">
+            </div>
+            <div class="clickIcon">
+                <img src="images/playbutton.png" alt="Start/resume path">
+            </div>
+            <div class="clickIcon">
+                <img src="images/pausebutton.png" alt="Stop path">
+            </div>
+            <div class="clickIcon">
+                <img src="images/waypointicon.png" alt="Add a waypoint">
+            </div>
+            <div class="clickIcon">
+                <img src="images/imagestargeticon.png" alt="Select target location">
+            </div>
+        </div>
+
+        <div class="progress-container">
+            <input type="range" min="0" max="100" value="0" id="progressSlider" class="slider">
+            <div class="progress-bar">
+                <div id="progressFill" class="progress-fill"></div>
+                <span id="progressValue">0%</span>
+            </div>
+        </div>
+
+        <div class="spacer"></div>
+
+        <label class="switch">
+            <input type="checkbox" id="websocket_on" margin-right="0">
+        </label>
+
+        <label class="switch">
+            <input type="checkbox" id="offpath">
+        </label>
+
+        <div class="icon">
+            <img id="togglePathDeviation" src="images/onpath.png" alt="Bot is on path" margin-right="0">
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <div class="content">
+        <div class="message_window">
+            <h1>Message Box</h1>
+            <div id="messages" class="messages"></div>
+        </div>
+
+        <div class="map_feed">
+            <h1>Map Feed</h1>
+        </div>
+    </div>
+
+    <!-- Load JS *after* everything is built -->
+    <script src="pathdeviation.js" defer></script>
+    <script src="connection.js" defer></script>
+    <script src="messageBox.js" defer></script>
+</body>
+</html>

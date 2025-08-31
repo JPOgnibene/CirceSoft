@@ -1,0 +1,12 @@
+As CirceSoft, I want to establish a Websocket Connection with CirceBot, 
+then close the connection when it is no longer needed, so that I can initiate 
+and close real-time communication
+
+Prerequisites
+    Raspberry Pi: Any model (e.g., Raspberry Pi 4, Zero).
+    Raspberry Pi OS: Installed and updated on your Raspberry Pi.
+    Python 3.x: Installed on your Raspberry Pi.
+    Web Browser: For testing the WebSocket client.
+    Internet Connection: For Raspberry Pi and client (optional).
+
+----------------------------------------------------------------------------------

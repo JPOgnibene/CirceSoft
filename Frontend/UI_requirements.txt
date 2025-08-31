@@ -1,0 +1,17 @@
+UI changes- write user stories to reflect
+
+Icons and buttons:
+- web socket connection indicator icon on/off
+- import path button: opens file explorer window or filepath entry box, uploads contents of file to target destination
+- play button: icon indicates whether or not the bot is moving
+	click to start bot on its path to target destination
+- stop button: click to stop bot 
+- Percentage of path complete: bar shows how much of path has been completed
+- Stray from path indicator (represents boolean)
+- Target: Add target destination by clicking on the button and then clicking on the live aerial display
+- Waypoints: same as target
+
+Partitions:
+Incoming messages: display text messages from Circebot
+Icon/Button bar
+Live aerial feed (interactive for setting waypoints or targets)

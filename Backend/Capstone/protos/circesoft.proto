@@ -1,0 +1,29 @@
+syntax = "proto3";
+package circesoft;
+
+// Basic ECI position (meters)
+message PositionECI {
+  double X_ECI = 1;
+  double Y_ECI = 2;
+  double Z_ECI = 3;
+}
+
+// Basic ECI velocity (m/s)
+message VelocityECI {
+  double Vx_ECI = 1;
+  double Vy_ECI = 2;
+  double Vz_ECI = 3;
+}
+
+// Status reported by the client/device.
+message CurrentStatus {
+  PositionECI reportedPosition = 1;
+  VelocityECI reportedVelocity = 2;
+  double reportedHeading = 3;                 // deg
+  double reportedCableRemaining_m = 4;        // m
+  double reportedPercentBatteryRemaining = 5; // 0..100
+  int32 errorCode = 6;
+  string cableDispenseStatus = 7;             // e.g. IDLE, DISPENSING
+  string cableDispenseCommand = 8;            // e.g. START, STOP
+  int64 SequenceNum = 9;                      // monotonic counter
+}

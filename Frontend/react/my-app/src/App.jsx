@@ -1,34 +1,45 @@
-import "./App.css"; // or your old style.css
+import React, { useRef } from 'react';
+import './App.css';
+import MessageWindow from './components/MessageWindow';
+import WebsocketTester from "./components/WebsocketTester";
+import {
+  WebsocketStatusIcon,
+  ImportPathIcon,
+  PlayButtonIcon,
+  PauseButtonIcon,
+  WaypointIcon,
+  TargetIcon,
+  OnPathIcon,
+} from "./components/Icons";
+import { useReducer } from 'react';
+
 
 function App() {
+  const messageBoxRef = useRef();
+  
   return (
     <div>
       <header className="header">
         <div className="icons">
           <div className="icon">
-            <img
-              id="toggleImage"
-              src="/contents/images/websocket_connection_off.png"
-              alt="Websocket Status"
-            />
+            <WebsocketStatusIcon messageBoxRef={messageBoxRef }/>
           </div>
           <div className="clickIcon">
-            <img src="/contents/images/importpathicon.png" alt="Import path" />
+            <ImportPathIcon messageBoxRef={messageBoxRef} />
           </div>
           <div className="clickIcon">
-            <img src="/contents/images/playbutton.png" alt="Start/resume path" />
+            <PlayButtonIcon messageBoxRef={messageBoxRef} />
           </div>
           <div className="clickIcon">
-            <img src="/contents/images/pausebutton.png" alt="Stop path" />
+            <PauseButtonIcon messageBoxRef={messageBoxRef} />
           </div>
           <div className="clickIcon">
-            <img src="/contents/images/waypointicon.png" alt="Add a waypoint" />
+            <WaypointIcon messageBoxRef={messageBoxRef} />
           </div>
           <div className="clickIcon">
-            <img src="/contents/images/imagestargeticon.png" alt="Select target location" />
+            <TargetIcon messageBoxRef={messageBoxRef} />
           </div>
         </div>
-
         <div className="progress-container">
           <input type="range" min="0" max="100" defaultValue="0" id="progressSlider" className="slider" />
           <div className="progress-bar">
@@ -36,31 +47,23 @@ function App() {
             <span id="progressValue">0%</span>
           </div>
         </div>
-
         <div className="spacer"></div>
-
         <label className="switch">
           <input type="checkbox" id="websocket_on" />
         </label>
-
         <label className="switch">
           <input type="checkbox" id="offpath" />
         </label>
-
         <div className="icon">
-          <img id="togglePathDeviation" src="/contents/images/onpath.png" alt="Bot is on path" />
+          <OnPathIcon messageBoxRef={messageBoxRef} />
         </div>
       </header>
 
       {/* Main Content Area */}
       <div className="content">
-        <div className="message_window">
-          <h1>Message Box</h1>
-          <div id="messages" className="messages"></div>
-        </div>
-
+        <MessageWindow ref={ messageBoxRef } />
+        <WebsocketTester />
         <div className="map_feed">
-          <h1>Map Feed</h1>
         </div>
       </div>
     </div>

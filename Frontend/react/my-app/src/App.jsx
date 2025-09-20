@@ -12,6 +12,7 @@ import {
   OnPathIcon,
 } from "./components/Icons";
 import { useReducer } from 'react';
+import ClickToPath from './components/ClickToPath';
 
 
 function App() {
@@ -64,6 +65,7 @@ function App() {
         <MessageWindow ref={ messageBoxRef } />
         <WebsocketTester />
         <div className="map_feed">
+          <ClickToPath />
         </div>
       </div>
     </div>

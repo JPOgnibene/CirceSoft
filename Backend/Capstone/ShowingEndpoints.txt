@@ -1,0 +1,15 @@
+curl -v http://localhost:8765/health
+
+curl -v http://localhost:8765/current-values
+
+curl -v http://localhost:8765/directions
+
+
+curl -v -X PUT http://localhost:8765/directions \
+     -H "Content-Type: text/plain" \
+     --data "Turn left, then ascend 200m"
+
+
+websocat ws://localhost:8765/ws
+
+

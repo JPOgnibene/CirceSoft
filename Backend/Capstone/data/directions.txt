@@ -1,2 +1,1 @@
-TURN_LEFT=15
-SPEED=2.0
+Turn left, then ascend 200m

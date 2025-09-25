@@ -2,9 +2,9 @@ import asyncio
 import os
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body
 from fastapi.responses import PlainTextResponse
+from fastapi.middleware.cors import CORSMiddleware  # Add this import
 from dotenv import load_dotenv
 import uvicorn
-
 from receiver import handle_client_message
 from protos import circesoft_pb2
 
@@ -17,6 +17,15 @@ CURRENT_VALUES_PATH = os.getenv("CURRENT_VALUES_PATH", "./data/current_values.tx
 DIRECTIONS_PATH = os.getenv("DIRECTIONS_PATH", "./data/directions.txt")
 
 app = FastAPI(title="CirceSoft Control Server", version="1.0")
+
+# Add CORS middleware - ADD THESE LINES
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, replace with specific origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # -------- file helpers
 

@@ -1,1 +1,1 @@
-Turn left, then ascend 200m
+FORWARD 5m

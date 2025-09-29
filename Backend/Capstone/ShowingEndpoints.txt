@@ -1,15 +1,105 @@
-curl -v http://localhost:8765/health
+# Health Check
+curl -X GET http://localhost:8765/health
 
-curl -v http://localhost:8765/current-values
+# Get Current Values
+curl -X GET http://localhost:8765/current-values
 
-curl -v http://localhost:8765/directions
+# Get Directions
+curl -X GET http://localhost:8765/directions
+
+# Put Directions (Example: sending "MOVE FORWARD 10" as plain text)
+curl -X PUT -H "Content-Type: text/plain" -d "MOVE FORWARD 10" http://localhost:8765/directions
+
+# Get Grid Manifest
+curl -X GET http://localhost:8765/grid/manifest
+
+# Get Grid Image (Saves file as current_image.png)
+curl -X GET http://localhost:8765/grid/image --output current_image.png
+
+# Get Grid Coordinates (Saves file as grid_coordinates.csv)
+curl -X GET http://localhost:8765/grid/coordinates --output grid_coordinates.csv
+
+# Get Grid Obstacles (Saves file as obstacles.csv)
+curl -X GET http://localhost:8765/grid/obstacles --output obstacles.csv
+
+# Get Grid Bundle (Saves file with generated name, e.g., grid_bundle_20250925-133230.zip)
+# Note: The output filename includes a timestamp, so you'll need to check the exact name or force one.
+curl -X GET http://localhost:8765/grid/bundle --remote-header-name --remote-name
+# Alternative for a fixed name:
+# curl -X GET http://localhost:8765/grid/bundle --output grid_bundle.zip
 
 
-curl -v -X PUT http://localhost:8765/directions \
-     -H "Content-Type: text/plain" \
-     --data "Turn left, then ascend 200m"
+const BASE_URL = "http://localhost:8765";
 
+// /health
+async function getHealth() {
+  const response = await fetch(`${BASE_URL}/health`);
+  return await response.text();
+}
 
-websocat ws://localhost:8765/ws
+// /current-values
+async function getCurrentValues() {
+  const response = await fetch(`${BASE_URL}/current-values`);
+  return await response.text();
+}
 
+// /directions
+async function getDirections() {
+  const response = await fetch(`${BASE_URL}/directions`);
+  return await response.text();
+}
+
+// /grid/manifest
+async function getGridManifest() {
+  const response = await fetch(`${BASE_URL}/grid/manifest`);
+  return await response.json();
+}
+
+// /grid/image, /grid/coordinates, /grid/obstacles, /grid/bundle
+// These typically return a file. They can be fetched and then processed (e.g., as a Blob or ArrayBuffer)
+async function getFile(endpoint) {
+  const response = await fetch(`${BASE_URL}${endpoint}`);
+  if (response.ok) {
+    // For images/ZIP/CSV, you might want a Blob
+    return await response.blob(); 
+    // If you want the content as text (e.g., for CSVs)
+    // return await response.text();
+  } else {
+    throw new Error(`Failed to fetch ${endpoint}: ${response.statusText}`);
+  }
+}
+
+// Example usage:
+// getHealth().then(data => console.log('Health:', data));
+// getFile('/grid/image').then(blob => {
+//   const imageUrl = URL.createObjectURL(blob);
+//   // Use imageUrl for an <img> tag's src
+// });
+
+const DIRECTIONS_URL = "http://localhost:8765/directions";
+const newDirections = "MOVE FORWARD 10";
+
+async function sendDirections(directions) {
+  try {
+    const response = await fetch(DIRECTIONS_URL, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'text/plain', // Crucial header for the endpoint
+      },
+      body: directions, // The string itself becomes the body
+    });
+
+    if (response.ok) {
+      const status = await response.text();
+      console.log('Directions updated successfully:', status); // Should log: updated
+    } else {
+      console.error('Failed to update directions:', response.status, response.statusText);
+    }
+  } catch (error) {
+    console.error('Network error:', error);
+  }
+}
+
+// Call the function to send the data
+sendDirections(newDirections);
 

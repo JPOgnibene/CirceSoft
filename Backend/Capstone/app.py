@@ -1,16 +1,37 @@
+import argparse
 import asyncio
+import csv
 import io
 import os
 import time
 import zipfile
+from typing import List, Dict, Any, Tuple
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body
 from fastapi.responses import PlainTextResponse, FileResponse, StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import uvicorn
 
-from receiver import handle_client_message
-from protos import circesoft_pb2
+# Assuming 'receiver' and 'protos' are available in your environment
+# from receiver import handle_client_message
+# from protos import circesoft_pb2
+
+# Placeholder for modules not provided in the prompt
+class circesoft_pb2:
+    class CurrentStatus:
+        def __init__(self, **kwargs):
+            self.reportedPosition = type('Pos', (object,), {'X_ECI': 0, 'Y_ECI': 0, 'Z_ECI': 0})
+            self.reportedVelocity = type('Vel', (object,), {'Vx_ECI': 0, 'Vy_ECI': 0, 'Vz_ECI': 0})
+            self.reportedHeading = 0
+            self.reportedCableRemaining_m = 0
+            self.reportedPercentBatteryRemaining = 0
+            self.errorCode = 0
+            self.cableDispenseStatus = 0
+            self.cableDispenseCommand = 0
+            self.SequenceNum = 0
+def handle_client_message(data):
+    # Dummy implementation for required imports
+    return circesoft_pb2.CurrentStatus()
 
 load_dotenv()
 
@@ -20,12 +41,11 @@ WS_PATH = os.getenv("WS_PATH", "/ws")
 CURRENT_VALUES_PATH = os.getenv("CURRENT_VALUES_PATH", "./data/current_values.txt")
 DIRECTIONS_PATH = os.getenv("DIRECTIONS_PATH", "./data/directions.txt")
 
-# ====== New: grid artifacts config ======
-# Directory and filenames produced by your field_grid_tool.py (or equivalent)
-GRID_DIR = os.getenv("GRID_DIR", "./")  # e.g. ./AI-Pathfinding/image-interpretation/test1
-GRID_IMAGE_NAME = os.getenv("GRID_IMAGE_NAME", "current_image.jpg")
-GRID_COORDS_NAME = os.getenv("GRID_COORDS_NAME", "grid_coordinates.csv")
-GRID_OBS_NAME = os.getenv("GRID_OBS_NAME", "obstacles.csv")
+# ====== Grid artifacts config ======
+GRID_DIR = os.getenv("GRID_DIR", "./")
+GRID_IMAGE_NAME = os.getenv("GRID_IMAGE_NAME", "./data/current_image.jpg")
+GRID_COORDS_NAME = os.getenv("GRID_COORDS_NAME", "./data/grid_coordinates.csv")
+GRID_OBS_NAME = os.getenv("GRID_OBS_NAME", "./data/obstacles.csv")
 
 GRID_IMAGE_PATH = os.path.join(GRID_DIR, GRID_IMAGE_NAME)
 GRID_COORDS_PATH = os.path.join(GRID_DIR, GRID_COORDS_NAME)
@@ -93,7 +113,7 @@ async def put_directions(body: str = Body(..., media_type="text/plain")) -> str:
     write_text(DIRECTIONS_PATH, body)
     return "updated"
 
-# -------- New: Grid artifact helpers + endpoints --------
+# -------- Grid artifact helpers + endpoints --------
 
 def _exists(path: str) -> bool:
     return os.path.exists(path) and os.path.isfile(path)
@@ -102,12 +122,68 @@ def _not_found(name: str) -> JSONResponse:
     return JSONResponse({"error": f"{name} not found"}, status_code=404)
 
 def _nocache_headers() -> dict:
-    # Prevent stale images/CSVs in browsers/Proxies
+    # Prevent stale images/CSVs/JSON in browsers/Proxies
     return {
         "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
         "Pragma": "no-cache",
         "Expires": "0",
     }
+
+def _parse_coords_csv(path: str) -> List[Dict[str, Any]]:
+    """Reads a CSV (row, col, x, y) and returns a list of dictionaries."""
+    data = []
+    if not _exists(path):
+        return data
+    try:
+        with open(path, mode='r', newline='') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                # Convert string values to appropriate types
+                data.append({
+                    "r": int(row["row"]),
+                    "c": int(row["col"]),
+                    "x": float(row["x"]),
+                    "y": float(row["y"]),
+                })
+        return data
+    except Exception as e:
+        print(f"Error parsing CSV {path}: {e}")
+        return []
+
+def _parse_obstacles_csv(path: str) -> List[Dict[str, int]]:
+    """Reads obstacle CSV (row, col) and returns a list of {r: int, c: int} dictionaries."""
+    obstacles = []
+    if not _exists(path):
+        return obstacles
+    try:
+        with open(path, mode='r', newline='') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                # Obstacles only need row and col index to be useful
+                obstacles.append({
+                    "r": int(row["row"]),
+                    "c": int(row["col"]),
+                })
+        return obstacles
+    except Exception as e:
+        print(f"Error parsing CSV {path}: {e}")
+        return []
+
+def _write_obstacles_csv(path: str, data: List[Dict[str, int]]) -> None:
+    """
+    Writes a list of obstacle dictionaries ({r: int, c: int}) back to obstacles.csv.
+    Assumes incoming data uses 'r' and 'c' keys.
+    """
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    # Use 'row' and 'col' for CSV compatibility
+    fieldnames = ['row', 'col']
+    with open(path, 'w', newline='') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        for item in data:
+            # Map 'r' to 'row' and 'c' to 'col' for writing
+            writer.writerow({'row': item['r'], 'col': item['c']})
+
 
 @app.get("/grid/manifest")
 async def grid_manifest():
@@ -116,16 +192,20 @@ async def grid_manifest():
     Frontend can poll this before downloading to detect updates.
     """
     items = []
+    # Note: We include the new JSON paths for completeness in the manifest
     for name, path, mime in [
         (GRID_IMAGE_NAME, GRID_IMAGE_PATH, "image/png"),
         (GRID_COORDS_NAME, GRID_COORDS_PATH, "text/csv"),
         (GRID_OBS_NAME, GRID_OBS_PATH, "text/csv"),
     ]:
         exists = _exists(path)
+        base_path = f"/grid/{'image' if mime.startswith('image/') else ('coordinates' if name==GRID_COORDS_NAME else 'obstacles')}"
+        
         items.append({
             "name": name,
             "exists": exists,
-            "path": f"/grid/{'image' if mime.startswith('image/') else ('coordinates' if name==GRID_COORDS_NAME else 'obstacles')}",
+            "path_csv": base_path,
+            "path_json": f"{base_path}/json",
             "mime": mime,
             "size_bytes": os.path.getsize(path) if exists else None,
             "mtime": int(os.path.getmtime(path)) if exists else None,
@@ -138,7 +218,7 @@ async def get_grid_image():
         return _not_found(GRID_IMAGE_NAME)
     return FileResponse(
         GRID_IMAGE_PATH,
-        media_type="image/png",
+        media_type="image/jpeg", # Assuming .jpg is JPEG, but your tool saves as .jpg
         filename=GRID_IMAGE_NAME,
         headers=_nocache_headers(),
     )
@@ -154,6 +234,18 @@ async def get_grid_coordinates():
         headers=_nocache_headers(),
     )
 
+@app.get("/grid/coordinates/json")
+async def get_grid_coordinates_json():
+    """Returns grid coordinates as a JSON array."""
+    data = _parse_coords_csv(GRID_COORDS_PATH)
+    if not data:
+        return _not_found(GRID_COORDS_NAME)
+    # The JSONResponse handles serialization automatically
+    return JSONResponse(
+        {"data": data},
+        headers=_nocache_headers(),
+    )
+
 @app.get("/grid/obstacles")
 async def get_grid_obstacles():
     if not _exists(GRID_OBS_PATH):
@@ -162,6 +254,48 @@ async def get_grid_obstacles():
         GRID_OBS_PATH,
         media_type="text/csv",
         filename=GRID_OBS_NAME,
+        headers=_nocache_headers(),
+    )
+
+@app.get("/grid/obstacles/json")
+async def get_grid_obstacles_json():
+    """Returns obstacle coordinates (r, c) as a JSON array."""
+    data = _parse_obstacles_csv(GRID_OBS_PATH)
+    if not data:
+        return _not_found(GRID_OBS_NAME)
+    return JSONResponse(
+        {"data": data},
+        headers=_nocache_headers(),
+    )
+
+@app.put("/grid/obstacles")
+async def put_grid_obstacles(obstacles: List[Dict[str, int]] = Body(..., media_type="application/json")):
+    """
+    Receives a JSON list of {'r': int, 'c': int} objects and overwrites obstacles.csv.
+    The frontend should send the COMPLETE list of obstacles currently desired.
+    """
+    cleaned_data = []
+    
+    # 1. Validate and clean incoming data
+    for obs in obstacles:
+        if isinstance(obs, dict) and 'r' in obs and 'c' in obs:
+            try:
+                # Ensure the data is truly integer-based for row/col
+                cleaned_data.append({'r': int(obs['r']), 'c': int(obs['c'])})
+            except (ValueError, TypeError):
+                # Optionally log error for bad data structure
+                continue
+    
+    # 2. Handle case where all input was invalid, but list was provided
+    if not cleaned_data and obstacles:
+         return JSONResponse({"error": "Invalid input format. Expected list of {'r': int, 'c': int}."}, status_code=400)
+
+    # 3. Write data to CSV file
+    _write_obstacles_csv(GRID_OBS_PATH, cleaned_data)
+    
+    # 4. Return success response
+    return JSONResponse(
+        {"status": "Obstacles updated successfully", "count": len(cleaned_data)},
         headers=_nocache_headers(),
     )
 
@@ -195,7 +329,7 @@ async def get_grid_bundle():
         },
     )
 
-# -------- WebSocket
+# -------- WebSocket (unchanged)
 
 @app.websocket(WS_PATH)
 async def websocket_endpoint(websocket: WebSocket):

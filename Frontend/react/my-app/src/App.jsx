@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import './App.css';
 import MessageWindow from './components/MessageWindow';
 import WebsocketTester from "./components/WebsocketTester";
+import TransformGrid from "./components/TransformGrid";
 import {
   WebsocketStatusIcon,
   ImportPathIcon,
@@ -13,7 +14,6 @@ import {
 } from "./components/Icons";
 import { useReducer } from 'react';
 import ClickToPath from './components/ClickToPath';
-
 
 function App() {
   const messageBoxRef = useRef();
@@ -65,7 +65,8 @@ function App() {
         <MessageWindow ref={ messageBoxRef } />
         <WebsocketTester />
         <div className="map_feed">
-          <ClickToPath />
+         {/*<ClickToPath /> */}
+        <TransformGrid />
         </div>
       </div>
     </div>

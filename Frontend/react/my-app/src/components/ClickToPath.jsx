@@ -1,11 +1,19 @@
 import React, { useState, useRef, useEffect } from "react";
-import Graph from "./Graph";
+import {useTransformContext} from "react-zoom-pan-pinch";
+//(deprecated) import Graph from "./Graph";
+import GridMap from "./GridMap";
 
 const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10 }) => {
   const [path, setPath] = useState([]); // store clicked dots
   const [sliderValue, setSliderValue] = useState(0); // position along path
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 800, height: 600 });
+
+  // grab zoom state
+  const transformContext = useTransformContext();
+  const scale = transformContext?.state?.scale ?? 1;
+  const positionX = transformContext?.state?.positionX ?? 1;
+  const positionY = transformContext?.state?.positionY ?? 1;
 
   useEffect(() => {
     const el = containerRef.current;
@@ -76,7 +84,7 @@ const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10 }) => {
   return (
     <>
     <div
-      style={{ position: "relative", width: "100%", height: "100%", minHeight: 300 }}
+      style={{ position: "relative", width: "800px", height: "600px" }}
     >
       <div
         style={{
@@ -87,7 +95,8 @@ const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10 }) => {
         onClick={handleClick}
         ref={containerRef}
       >
-        <Graph />
+        {/*deprecated <Graph />*/}
+        <GridMap points={path} />
 
         {/* Draw completed and remaining paths */}
         <svg
@@ -151,10 +160,10 @@ const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10 }) => {
           alt="moving"
           style={{
             position: "absolute",
-            left: px - 16,
-            top: py - 16,
-            width: 32,
-            height: 32,
+            left: px - (16 * scale),
+            top: py - (16 * scale),
+            width: 32 * scale,
+            height: 32 * scale,
             pointerEvents: "none",
           }}
         />

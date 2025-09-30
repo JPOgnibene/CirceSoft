@@ -3,6 +3,8 @@ import './App.css';
 import MessageWindow from './components/MessageWindow';
 import WebsocketTester from "./components/WebsocketTester";
 import TransformGrid from "./components/TransformGrid";
+import Slider from "./components/Slider";
+
 import {
   WebsocketStatusIcon,
   ImportPathIcon,
@@ -42,11 +44,7 @@ function App() {
           </div>
         </div>
         <div className="progress-container">
-          <input type="range" min="0" max="100" defaultValue="0" id="progressSlider" className="slider" />
-          <div className="progress-bar">
-            <div id="progressFill" className="progress-fill"></div>
-            <span id="progressValue">0%</span>
-          </div>
+          <Slider />
         </div>
         <div className="spacer"></div>
         <label className="switch">
@@ -56,6 +54,7 @@ function App() {
           <input type="checkbox" id="offpath" />
         </label>
         <div className="icon">
+          {/*FIXME: Add functionality to replace ClickToPath slider*/}
           <OnPathIcon messageBoxRef={messageBoxRef} />
         </div>
       </header>

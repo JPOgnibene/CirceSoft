@@ -37,6 +37,7 @@ const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10 }) => {
     const xCoord = xMin + (px / rect.width) * (xMax - xMin);
     const yCoord = yMax - (py / rect.height) * (yMax - yMin);
 
+
     setPath((p) => [...p, { x: xCoord, y: yCoord }]);
   };
 

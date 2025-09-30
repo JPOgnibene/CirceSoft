@@ -126,13 +126,14 @@
       background-color: #4caf50;
       width:0%;
       transition: width 0.3 ease-in-out;
+      position: relative;
     }
   
     .slider {
       width: 150px;
     }
   
-    #progressValue {
+    .progress-value {
       position: absolute;
       width: 100%;
       text-align: center;
@@ -143,5 +144,6 @@
       color: black;
       font-weight: bold;
       pointer-events: none;
+      z-index: 1;
    }
   

@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import './App.css';
 import MessageWindow from './components/MessageWindow';
 import WebsocketTester from "./components/WebsocketTester";
-import TransformGrid from "./components/TransformGrid";
+import MapView from "./components/MapView";
 import Slider from "./components/Slider";
 
 import {
@@ -65,7 +65,7 @@ function App() {
         <WebsocketTester />
         <div className="map_feed">
          {/*<ClickToPath /> */}
-        <TransformGrid />
+        <MapView />
         </div>
       </div>
     </div>

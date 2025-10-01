@@ -4,6 +4,7 @@ import MessageWindow from './components/MessageWindow';
 import WebsocketTester from "./components/WebsocketTester";
 import MapView from "./components/MapView";
 import Slider from "./components/Slider";
+import EmergencyStop from "./components/Stop";
 
 import {
   WebsocketStatusIcon,
@@ -40,6 +41,9 @@ function App() {
           <div className="clickIcon">
             <WaypointIcon messageBoxRef={messageBoxRef} />
           </div>
+          <div>
+            <EmergencyStop messageBoxRef={messageBoxRef} />
+          </div>
           <div className="clickIcon">
             <TargetIcon messageBoxRef={messageBoxRef} />
           </div>
@@ -62,7 +66,7 @@ function App() {
       {/* Main Content Area */}
       <div className="content">
         <MessageWindow ref={ messageBoxRef } />
-        <WebsocketTester />
+        {/* <WebsocketTester /> */}
         <div className="map_feed">
          {/*<ClickToPath /> */}
         <MapView sliderValue={completionProgress}/>

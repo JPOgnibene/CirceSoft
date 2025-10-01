@@ -36,8 +36,12 @@ const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10, pathProgress })
     const xCoord = xMin + (px / rect.width) * (xMax - xMin);
     const yCoord = yMax - (py / rect.height) * (yMax - yMin);
 
-
-    setPath((p) => [...p, { x: xCoord, y: yCoord }]);
+    console.log("Click raw:", e.clientX, e.clientY);
+    console.log("Converted coords:", xCoord, yCoord);
+    setPath((p) => {
+      console.log("Previous path:", p);
+      return [...p, { x: xCoord, y: yCoord }];
+    });
   };
 
   // Map graph coordinates to pixels
@@ -137,6 +141,7 @@ const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10, pathProgress })
 
         {/* Dots you click */}
         {path.map((dot, index) => {
+          console.log(`Dot #${index}:`, dot);
           const { px, py } = graphToPixel(dot);
           return (
             <div

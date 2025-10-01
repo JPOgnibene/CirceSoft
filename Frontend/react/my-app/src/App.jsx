@@ -68,7 +68,6 @@ function App() {
         <MessageWindow ref={ messageBoxRef } />
         {/* <WebsocketTester /> */}
         <div className="map_feed">
-         {/*<ClickToPath /> */}
         <MapView sliderValue={completionProgress}/>
         </div>
       </div>

@@ -2,7 +2,7 @@ import React from "react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import ClickToPath from "./ClickToPath";
 
-export default function MapView() {
+export default function MapView(sliderValue) {
   return (
     <div style={{ width: "800px", height: "600px", border: "1px solid black" }}>
       <TransformWrapper
@@ -15,7 +15,7 @@ export default function MapView() {
         {({ state }) => (
         <TransformComponent>
           {/*<img src="/imagefrombackend/aerialview.png" alt="Aerial Map" width="800" />*/}
-          <ClickToPath />
+          <ClickToPath pathProgress={sliderValue} />
         </TransformComponent>
         )}
       </TransformWrapper>

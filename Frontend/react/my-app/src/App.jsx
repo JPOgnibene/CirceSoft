@@ -1,8 +1,10 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import './App.css';
 import MessageWindow from './components/MessageWindow';
 import WebsocketTester from "./components/WebsocketTester";
-import TransformGrid from "./components/TransformGrid";
+import MapView from "./components/MapView";
+import Slider from "./components/Slider";
+
 import {
   WebsocketStatusIcon,
   ImportPathIcon,
@@ -17,7 +19,8 @@ import ClickToPath from './components/ClickToPath';
 
 function App() {
   const messageBoxRef = useRef();
-  
+  const [completionProgress, setValue] = useState(0);
+
   return (
     <div>
       <header className="header">
@@ -42,11 +45,7 @@ function App() {
           </div>
         </div>
         <div className="progress-container">
-          <input type="range" min="0" max="100" defaultValue="0" id="progressSlider" className="slider" />
-          <div className="progress-bar">
-            <div id="progressFill" className="progress-fill"></div>
-            <span id="progressValue">0%</span>
-          </div>
+          <Slider onChange={setValue}/>
         </div>
         <div className="spacer"></div>
         <label className="switch">
@@ -66,7 +65,7 @@ function App() {
         <WebsocketTester />
         <div className="map_feed">
          {/*<ClickToPath /> */}
-        <TransformGrid />
+        <MapView sliderValue={completionProgress}/>
         </div>
       </div>
     </div>

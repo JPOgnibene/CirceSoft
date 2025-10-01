@@ -3,9 +3,8 @@ import {useTransformContext} from "react-zoom-pan-pinch";
 //(deprecated) import Graph from "./Graph";
 import GridMap from "./GridMap";
 
-const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10 }) => {
+const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10, pathProgress }) => {
   const [path, setPath] = useState([]); // store clicked dots
-  const [sliderValue, setSliderValue] = useState(0); // position along path
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 800, height: 600 });
 
@@ -53,9 +52,10 @@ const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10 }) => {
   const getPosition = () => {
     if (path.length === 0) return { x: 0, y: 0, index: 0 };
     if (path.length === 1) return { ...path[0], index: 0 };
+    console.log("Slider value is ", pathProgress)
 
     const totalSegments = path.length - 1;
-    const pos = (sliderValue / 100) * totalSegments;
+    const pos = (pathProgress.sliderValue / 100) * totalSegments;
     const index = Math.floor(pos);
     const t = pos - index;
 
@@ -169,17 +169,6 @@ const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10 }) => {
           }}
         />
       </div>
-        <div>
-          {/* Slider to move image along path */}
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={sliderValue}
-            onChange={(e) => setSliderValue(Number(e.target.value))}
-            style={{ position: "absolute", bottom: 10, width: "calc(100% - 20px)", left: 10 }}
-          />
-        </div>
       </div>
   </>
   );

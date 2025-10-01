@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import './App.css';
 import MessageWindow from './components/MessageWindow';
 import WebsocketTester from "./components/WebsocketTester";
@@ -19,7 +19,8 @@ import ClickToPath from './components/ClickToPath';
 
 function App() {
   const messageBoxRef = useRef();
-  
+  const [completionProgress, setValue] = useState(0);
+
   return (
     <div>
       <header className="header">
@@ -44,7 +45,7 @@ function App() {
           </div>
         </div>
         <div className="progress-container">
-          <Slider />
+          <Slider onChange={setValue}/>
         </div>
         <div className="spacer"></div>
         <label className="switch">
@@ -54,7 +55,6 @@ function App() {
           <input type="checkbox" id="offpath" />
         </label>
         <div className="icon">
-          {/*FIXME: Add functionality to replace ClickToPath slider*/}
           <OnPathIcon messageBoxRef={messageBoxRef} />
         </div>
       </header>
@@ -65,7 +65,7 @@ function App() {
         <WebsocketTester />
         <div className="map_feed">
          {/*<ClickToPath /> */}
-        <MapView />
+        <MapView sliderValue={completionProgress}/>
         </div>
       </div>
     </div>

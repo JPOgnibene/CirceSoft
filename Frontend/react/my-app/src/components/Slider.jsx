@@ -22,7 +22,6 @@ const Slider = ({ onChange }) => {
         onChange={handleSliderChange}
         className="slider"
       />
-      {/*FIXME: progress bar not filling as slider progresses*/}
       <div className="progress-bar">
         <span className="progress-value">{value}%</span>
         <div

@@ -28,10 +28,24 @@ class circesoft_pb2:
             self.errorCode = 0
             self.cableDispenseStatus = 0
             self.cableDispenseCommand = 0
-            self.SequenceNum = 0
-def handle_client_message(data):
+            self.SequenceNum = kwargs.get('SequenceNum', 0)
+            self.isMoving = kwargs.get('isMoving', False)
+
+def handle_client_message(data) -> circesoft_pb2.CurrentStatus:
     # Dummy implementation for required imports
-    return circesoft_pb2.CurrentStatus()
+    msg = circesoft_pb2.CurrentStatus()
+    X_ECI = msg.reportedPosition.X_ECI
+    Y_ECI = msg.reportedPosition.Y_ECI
+
+    position_for_detector = {
+        'latitude': X_ECI,
+        'longitude': Y_ECI
+    }
+    msg.isMoving = is_bot_moving(position_for_detector)
+    return msg
+
+def is_bot_moving(position_for_detector: Dict[str, float]) -> bool:
+    return position_for_detector['latitude'] != 0.0 or position_for_detector['longitude'] != 0.0
 
 load_dotenv()
 
@@ -82,6 +96,7 @@ def write_status_to_file(msg: circesoft_pb2.CurrentStatus, file_path: str = CURR
         f.write(f"cableDispenseStatus={msg.cableDispenseStatus}\n")
         f.write(f"cableDispenseCommand={msg.cableDispenseCommand}\n")
         f.write(f"SequenceNum={msg.SequenceNum}\n")
+        f.write(f"isMoving={msg.isMoving}\n")
 
 
 def read_text(path: str) -> str:

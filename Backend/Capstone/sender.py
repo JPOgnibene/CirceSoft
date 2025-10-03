@@ -35,4 +35,11 @@ def build_client_status_from_file(path: str) -> bytes:
     msg.cableDispenseCommand = fields.get("cableDispenseCommand", "")
     msg.SequenceNum = int(fields.get("SequenceNum", 0))
 
+    position_for_detector = {
+        'latitude': X_ECI,  # Using X_ECI as latitude for simplicity
+        'longitude': Y_ECI, # Using Y_ECI as longitude for simplicity
+    }
+    msg.isMoving = is_bot_moving(position_for_detector)
+    
     return msg.SerializeToString()
+

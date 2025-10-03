@@ -26,4 +26,5 @@ message CurrentStatus {
   string cableDispenseStatus = 7;             // e.g. IDLE, DISPENSING
   string cableDispenseCommand = 8;            // e.g. START, STOP
   int64 SequenceNum = 9;                      // monotonic counter
+  bool isMoving = 10;
 }

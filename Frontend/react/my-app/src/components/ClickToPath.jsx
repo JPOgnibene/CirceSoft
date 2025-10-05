@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import {useTransformContext} from "react-zoom-pan-pinch";
 //(deprecated) import Graph from "./Graph";
 import GridMap from "./GridMap";
+import PlotGridPoints from "./PlotGridPoints"
 
 const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10, 
   pathProgress, path, setPath}) => {
@@ -21,6 +22,11 @@ const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10,
   const positionX = transformContext?.state?.positionX ?? 1;
   const positionY = transformContext?.state?.positionY ?? 1;
   console.log(path?.length)
+
+  //GRAHAM LOOK HERE
+  //PlotGridPoints.jsx
+  <PlotGridPoints dimensions={dimensions} />
+
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;

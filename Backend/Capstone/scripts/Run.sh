@@ -3,6 +3,7 @@ if [ -d "../.venv" ]; then
 else
     echo "I gotta create a virtual enviornment, give me a minute."
     
+    python3 -m venv ../.venv
     source ../.venv/bin/activate
 
 fi

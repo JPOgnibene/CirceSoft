@@ -3,8 +3,9 @@ import {useTransformContext} from "react-zoom-pan-pinch";
 //(deprecated) import Graph from "./Graph";
 import GridMap from "./GridMap";
 
-const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10, pathProgress }) => {
-  const [path, setPath] = useState([]); // store clicked dots
+const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10, pathProgress, path, setPath, FIELD_HEIGHT, FIELD_WIDTH}) => {
+
+  const [pixels, setPixels] = useState([]); //store pixel points of dots on screen
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 800, height: 600 });
 
@@ -13,7 +14,7 @@ const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10, pathProgress })
   const scale = transformContext?.state?.scale ?? 1;
   const positionX = transformContext?.state?.positionX ?? 1;
   const positionY = transformContext?.state?.positionY ?? 1;
-
+  console.log(path?.length)
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -49,6 +50,7 @@ const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10, pathProgress })
     const { width, height } = size;
     const px = ((dot.x - xMin) / (xMax - xMin)) * width;
     const py = ((yMax - dot.y) / (yMax - yMin)) * height;
+    console.log("Pixels are", px, "and", py)
     return { px, py };
   };
 
@@ -59,7 +61,7 @@ const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10, pathProgress })
     console.log("Slider value is ", pathProgress)
 
     const totalSegments = path.length - 1;
-    const pos = (pathProgress.sliderValue / 100) * totalSegments;
+    const pos = (pathProgress / 100) * totalSegments;
     const index = Math.floor(pos);
     const t = pos - index;
 
@@ -89,7 +91,11 @@ const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10, pathProgress })
   return (
     <>
     <div
-      style={{ position: "relative", width: "800px", height: "600px" }}
+      style={{
+        position: "relative",
+        width: `${FIELD_WIDTH}px`,
+        height: `${FIELD_HEIGHT}px`
+      }}
     >
       <div
         style={{
@@ -100,7 +106,6 @@ const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10, pathProgress })
         onClick={handleClick}
         ref={containerRef}
       >
-        {/*deprecated <Graph />*/}
         <GridMap points={path} />
 
         {/* Draw completed and remaining paths */}

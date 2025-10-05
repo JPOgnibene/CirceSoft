@@ -2,12 +2,19 @@ import React, { useState, useRef, useEffect } from "react";
 import {useTransformContext} from "react-zoom-pan-pinch";
 //(deprecated) import Graph from "./Graph";
 import GridMap from "./GridMap";
+import PlotGridPoints from "./PlotGridPoints"
 
-const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10, pathProgress, path, setPath, FIELD_HEIGHT, FIELD_WIDTH}) => {
-
+const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10, 
+  pathProgress, path, setPath}) => {
+  const [dimensions, setDimensions] = useState({ height: 0, width: 0}); //store dimensions of image
   const [pixels, setPixels] = useState([]); //store pixel points of dots on screen
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 800, height: 600 });
+
+  //watch dimensions for changes from GridMap
+  useEffect(() => {
+    console.log("Dimensions state updated:", dimensions);
+  }, [dimensions]);
 
   // grab zoom state
   const transformContext = useTransformContext();
@@ -15,6 +22,11 @@ const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10, pathProgress, p
   const positionX = transformContext?.state?.positionX ?? 1;
   const positionY = transformContext?.state?.positionY ?? 1;
   console.log(path?.length)
+
+  //GRAHAM LOOK HERE
+  //PlotGridPoints.jsx
+  <PlotGridPoints dimensions={dimensions} />
+
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -47,7 +59,7 @@ const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10, pathProgress, p
 
   // Map graph coordinates to pixels
   const graphToPixel = (dot) => {
-    const { width, height } = size;
+    const { width, height } = dimensions;
     const px = ((dot.x - xMin) / (xMax - xMin)) * width;
     const py = ((yMax - dot.y) / (yMax - yMin)) * height;
     console.log("Pixels are", px, "and", py)
@@ -93,8 +105,8 @@ const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10, pathProgress, p
     <div
       style={{
         position: "relative",
-        width: `${FIELD_WIDTH}px`,
-        height: `${FIELD_HEIGHT}px`
+        width: `${dimensions.width}px`,
+        height: `${dimensions.height}px`
       }}
     >
       <div
@@ -106,7 +118,7 @@ const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10, pathProgress, p
         onClick={handleClick}
         ref={containerRef}
       >
-        <GridMap points={path} />
+        <GridMap points={path} dimensions={dimensions} setDimensions={setDimensions} />
 
         {/* Draw completed and remaining paths */}
         <svg

@@ -1,12 +1,25 @@
 import React, { useRef, useState, useEffect } from "react";
 
-const GridMap = ({ points = [] }) => {
+const GridMap = ({ points = [] , dimensions, setDimensions}) => {
   console.log("GridMap component rendered")
   const [image, setBackgroundImg] = useState(null);
-  const [dimensions, setDimensions] = useState({ height: 0, width: 0});
 
-  //TODO: get ACCURATE pixels from image
-  
+  const getImageDimensions = (imagePath) => {
+    const img = new Image();
+    
+    img.onload = () => {
+      setDimensions({
+        height: img.naturalHeight,
+        width: img.naturalWidth
+      });
+      console.log("Image loaded: ", img.naturalHeight, img.naturalWidth)
+    };
+
+    console.log("setting image:", dimensions);
+    img.src = imagePath;
+    console.log("set image:", dimensions)
+  };
+
   useEffect(() => {
     //To test API: curl -o current_image.jpg http://localhost:8765/grid/image
     const fetchImage = async () => {
@@ -21,17 +34,30 @@ const GridMap = ({ points = [] }) => {
             throw new Error(`HTTP error: status ${response.status}`);
           }
 
+          
           const blob = await response.blob(); //convert response to a blob
           const imageUrl = URL.createObjectURL(blob); //create url from the blob
-          setBackgroundImg(imageUrl) //update image var with blob
-          setDimensions(imageUrl) // grab dimensions
+
+          //render the image from the blob in order to get the dimensions
+          img = new Image();
+          img.onload = () => {
+            setDimensions({
+            height: img.naturalHeight,
+            width: img.naturalWidth
+          });
+            URL.revokeObjectURL(imageUrl);
+          };
+          img.src = imageUrl;
+        
       
+          setBackgroundImg(imageUrl) //update image var with blob
+
         } catch (error) {
           console.log("Failed to fetch map background from API endpoint:", error)
           console.log("Defaulting to debug football field.")
           
           setBackgroundImg('/imagefrombackend/aerialview.png') //display default background img
-          setDimensions('/imagefrombackend/aerialview.png')    //grab dimensions of default background img
+          getImageDimensions('/imagefrombackend/aerialview.png')    //grab dimensions of default background img
         }
       }
 
@@ -51,7 +77,6 @@ const GridMap = ({ points = [] }) => {
         backgroundPosition: "center",
       }}
     >
-
     </div>
   );
 };

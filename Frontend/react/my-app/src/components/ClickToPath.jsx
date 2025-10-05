@@ -3,7 +3,7 @@ import {useTransformContext} from "react-zoom-pan-pinch";
 //(deprecated) import Graph from "./Graph";
 import GridMap from "./GridMap";
 
-const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10, pathProgress, path, setPath }) => {
+const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10, pathProgress, path, setPath, FIELD_HEIGHT, FIELD_WIDTH}) => {
 
   const [pixels, setPixels] = useState([]); //store pixel points of dots on screen
   const containerRef = useRef(null);
@@ -91,7 +91,11 @@ const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10, pathProgress, p
   return (
     <>
     <div
-      style={{ position: "relative", width: "800px", height: "600px" }}
+      style={{
+        position: "relative",
+        width: `${FIELD_WIDTH}px`,
+        height: `${FIELD_HEIGHT}px`
+      }}
     >
       <div
         style={{

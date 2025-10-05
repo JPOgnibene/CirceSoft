@@ -5,6 +5,7 @@ import WebsocketTester from "./components/WebsocketTester";
 import MapView from "./components/MapView";
 import Slider from "./components/Slider";
 import EmergencyStop from "./components/Stop";
+import SendToCirceBot from "./components/SendToCirceBot"
 
 import {
   WebsocketStatusIcon,
@@ -21,6 +22,7 @@ import ClickToPath from './components/ClickToPath';
 function App() {
   const messageBoxRef = useRef();
   const [completionProgress, setValue] = useState(0);
+  const [path, setPath] = useState([]); // store clicked dots (manipulated in ClickToPath.jsx)
 
   return (
     <div>
@@ -61,6 +63,9 @@ function App() {
         <div className="icon">
           <OnPathIcon messageBoxRef={messageBoxRef} />
         </div>
+        <div>
+          <SendToCirceBot path={path} />
+        </div>
       </header>
 
       {/* Main Content Area */}
@@ -68,7 +73,7 @@ function App() {
         <MessageWindow ref={ messageBoxRef } />
         {/* <WebsocketTester /> */}
         <div className="map_feed">
-        <MapView sliderValue={completionProgress}/>
+        <MapView sliderValue={completionProgress} path={path} setPath={setPath} />
         </div>
       </div>
     </div>

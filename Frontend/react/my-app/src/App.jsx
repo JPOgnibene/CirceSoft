@@ -6,6 +6,7 @@ import MapView from "./components/MapView";
 import Slider from "./components/Slider";
 import EmergencyStop from "./components/Stop";
 import SendToCirceBot from "./components/SendToCirceBot"
+import IsMovingStatus from "./components/BotMoving"
 
 import {
   WebsocketStatusIcon,
@@ -48,6 +49,9 @@ function App() {
           </div>
           <div className="clickIcon">
             <TargetIcon messageBoxRef={messageBoxRef} />
+          </div>
+          <div className="clickIcon">
+            <IsMovingStatus messageBoxRef={messageBoxRef} />
           </div>
         </div>
         <div className="progress-container">

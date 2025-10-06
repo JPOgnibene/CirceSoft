@@ -1,91 +1,121 @@
 import React, { useRef, useState, useEffect } from "react";
 
-const GridMapTest = () => {
+const GridMapTest = ({ mode }) => {   // <--- receive mode prop
   const [image, setBackgroundImg] = useState(null);
   const [gridData, setGridData] = useState([]);
   const [obstacles, setObstacles] = useState([]);
   const [imgDimensions, setImgDimensions] = useState({ width: 0, height: 0 });
   const imgRef = useRef(null);
 
-  // Fetch football field image
+  const GRID_ENDPOINT = "http://localhost:8765/grid/coordinates/json";
+  const IMAGE_ENDPOINT = "http://localhost:8765/grid/image";
+  const OBSTACLE_ENDPOINT = "http://localhost:8765/grid/obstacles";
+  const OBSTACLE_JSON_ENDPOINT = "http://localhost:8765/grid/obstacles/json";
+
+  // --- Fetch football field image ---
   useEffect(() => {
     const fetchImage = async () => {
       try {
-        console.log("Fetching field image...");
-        const response = await fetch("http://localhost:8765/grid/image");
+        const response = await fetch(IMAGE_ENDPOINT);
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
-
         const blob = await response.blob();
         const imageUrl = URL.createObjectURL(blob);
         setBackgroundImg(imageUrl);
       } catch (error) {
         console.error("Failed to fetch map background:", error);
-        setBackgroundImg("/imagefrombackend/aerialview.png"); // Fallback image
+        setBackgroundImg("/imagefrombackend/aerialview.png");
       }
     };
-
     fetchImage();
   }, []);
 
-  // Fetch grid JSON
+  // --- Fetch grid coordinates ---
   useEffect(() => {
     const fetchGrid = async () => {
       try {
-        console.log("Fetching grid data...");
-        const response = await fetch("http://localhost:8765/grid/coordinates/json");
+        const response = await fetch(GRID_ENDPOINT);
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
-
         const json = await response.json();
         setGridData(json.data || []);
       } catch (error) {
         console.error("Failed to fetch grid data:", error);
-        setGridData([]); // fallback empty grid
       }
     };
-
     fetchGrid();
   }, []);
 
-  // Fetch obstacles JSON
+  // --- Fetch obstacles ---
   useEffect(() => {
     const fetchObstacles = async () => {
       try {
-        console.log("Fetching obstacles data...");
-        const response = await fetch("http://localhost:8765/grid/obstacles/json");
+        const response = await fetch(OBSTACLE_JSON_ENDPOINT);
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
-
         const json = await response.json();
         setObstacles(json.data || []);
       } catch (error) {
-        console.error("Failed to fetch obstacles data:", error);
-        setObstacles([]); // fallback empty obstacles
+        console.error("Failed to fetch obstacle data:", error);
       }
     };
-
     fetchObstacles();
   }, []);
 
-  // Match obstacles (r,c) to actual grid (x,y)
-  const obstaclePoints = gridData.filter((gridPoint) =>
-    obstacles.some((obs) => obs.r === gridPoint.r && obs.c === gridPoint.c)
-  );
-
-  // When image loads, get its actual rendered pixel dimensions
+  // --- Get image dimensions ---
   const handleImageLoad = () => {
     if (imgRef.current) {
       const { naturalWidth, naturalHeight } = imgRef.current;
       setImgDimensions({ width: naturalWidth, height: naturalHeight });
-      console.log("Image dimensions:", { width: naturalWidth, height: naturalHeight });
     }
   };
 
+  // --- Determine if cell is an obstacle ---
+  const isObstacle = (r, c) => obstacles.some((obs) => obs.r === r && obs.c === c);
+
+  // --- Handle user click ---
+  const handlePointClick = async (point) => {
+    // 🚫 Prevent editing unless in obstacle mode
+    if (mode !== "obstacle") return;
+
+    const { r, c } = point;
+    let updatedObstacles;
+
+    if (isObstacle(r, c)) {
+      updatedObstacles = obstacles.filter((obs) => !(obs.r === r && obs.c === c));
+      console.log(`Removing obstacle at (r=${r}, c=${c})`);
+    } else {
+      updatedObstacles = [...obstacles, { r, c }];
+      console.log(`Adding obstacle at (r=${r}, c=${c})`);
+    }
+
+    setObstacles(updatedObstacles);
+
+    try {
+      const response = await fetch(OBSTACLE_ENDPOINT, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedObstacles),
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(`Failed: ${result.error || response.statusText}`);
+      console.log("Obstacles updated:", result);
+    } catch (error) {
+      console.error("Error updating obstacles:", error);
+    }
+  };
+
+  // --- Match obstacles to grid points ---
+  const obstaclePoints = gridData.filter((gridPoint) =>
+    obstacles.some((obs) => obs.r === gridPoint.r && obs.c === gridPoint.c)
+  );
+
+  // --- Render ---
   return (
     <div
       style={{
         position: "relative",
         display: "inline-block",
         width: "100%",
-        maxWidth: "1049px", // keep proportions similar to your example
+        maxWidth: "1049px",
       }}
     >
       {/* Background image */}
@@ -103,7 +133,7 @@ const GridMapTest = () => {
         />
       )}
 
-      {/* Overlay grid points */}
+      {/* Overlay grid + obstacles */}
       <svg
         width="100%"
         height="100%"
@@ -112,32 +142,27 @@ const GridMapTest = () => {
           position: "absolute",
           top: 0,
           left: 0,
-          pointerEvents: "none", // user can’t interact yet
         }}
       >
-        {gridData.map((point, index) => (
-          <circle
-            key={index}
-            cx={point.x}
-            cy={point.y}
-            r="3"
-            fill="red"
-            opacity="0.8"
-          />
-        ))}
-        {/* Highlight obstacle points */}
-        {obstaclePoints.map((point, index) => (
-          <circle
-            key={`obstacle-${index}`}
-            cx={point.x}
-            cy={point.y}
-            r="6"
-            fill="#009dffff" // bright yellow
-            stroke="black"
-            strokeWidth="2"
-            opacity="0.95"
-          />
-        ))}
+        {gridData.map((point, index) => {
+          const obstacle = isObstacle(point.r, point.c);
+          return (
+            <circle
+              key={index}
+              cx={point.x}
+              cy={point.y}
+              r={obstacle ? 6 : 3}
+              fill={obstacle ? "#00a6ffff" : "red"}
+              stroke={obstacle ? "black" : "none"}
+              strokeWidth={obstacle ? 2 : 0}
+              opacity={obstacle ? 0.95 : 0.6}
+              onClick={() => handlePointClick(point)}
+              style={{
+                cursor: mode === "obstacle" ? "pointer" : "default", // 👈 visual feedback
+              }}
+            />
+          );
+        })}
       </svg>
     </div>
   );

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import {useTransformContext} from "react-zoom-pan-pinch";
 //(deprecated) import Graph from "./Graph";
 import GridMap from "./GridMap";
+import GridMapTest from "./GridMapTest";
 
 const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10, pathProgress, path, setPath, FIELD_HEIGHT, FIELD_WIDTH}) => {
 
@@ -106,7 +107,7 @@ const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10, pathProgress, p
         onClick={handleClick}
         ref={containerRef}
       >
-        <GridMap points={path} />
+        <GridMapTest points={path} />
 
         {/* Draw completed and remaining paths */}
         <svg

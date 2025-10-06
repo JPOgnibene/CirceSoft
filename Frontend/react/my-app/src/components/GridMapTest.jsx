@@ -3,6 +3,7 @@ import React, { useRef, useState, useEffect } from "react";
 const GridMapTest = () => {
   const [image, setBackgroundImg] = useState(null);
   const [gridData, setGridData] = useState([]);
+  const [obstacles, setObstacles] = useState([]);
   const [imgDimensions, setImgDimensions] = useState({ width: 0, height: 0 });
   const imgRef = useRef(null);
 
@@ -44,6 +45,30 @@ const GridMapTest = () => {
 
     fetchGrid();
   }, []);
+
+  // Fetch obstacles JSON
+  useEffect(() => {
+    const fetchObstacles = async () => {
+      try {
+        console.log("Fetching obstacles data...");
+        const response = await fetch("http://localhost:8765/grid/obstacles/json");
+        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+
+        const json = await response.json();
+        setObstacles(json.data || []);
+      } catch (error) {
+        console.error("Failed to fetch obstacles data:", error);
+        setObstacles([]); // fallback empty obstacles
+      }
+    };
+
+    fetchObstacles();
+  }, []);
+
+  // Match obstacles (r,c) to actual grid (x,y)
+  const obstaclePoints = gridData.filter((gridPoint) =>
+    obstacles.some((obs) => obs.r === gridPoint.r && obs.c === gridPoint.c)
+  );
 
   // When image loads, get its actual rendered pixel dimensions
   const handleImageLoad = () => {
@@ -98,6 +123,19 @@ const GridMapTest = () => {
             r="3"
             fill="red"
             opacity="0.8"
+          />
+        ))}
+        {/* Highlight obstacle points */}
+        {obstaclePoints.map((point, index) => (
+          <circle
+            key={`obstacle-${index}`}
+            cx={point.x}
+            cy={point.y}
+            r="6"
+            fill="#009dffff" // bright yellow
+            stroke="black"
+            strokeWidth="2"
+            opacity="0.95"
           />
         ))}
       </svg>

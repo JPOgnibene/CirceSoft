@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useTransformContext } from "react-zoom-pan-pinch";
-import GridMapTest from "./GridMapTest";
+import GridMap from "./GridMap";
 
 const ClickToPath = ({
   xMin = 0,
@@ -132,8 +132,8 @@ const ClickToPath = ({
           onClick={handleClick}
           ref={containerRef}
         >
-          {/* Pass mode down to GridMapTest */}
-          <GridMapTest points={path} mode={mode} />
+          {/* Pass mode down to GridMap */}
+          <GridMap points={path} mode={mode} />
 
           {/* === PATH DRAWING === */}
           <svg
@@ -169,7 +169,7 @@ const ClickToPath = ({
                   })
                   .join(" ")}
                 fill="none"
-                stroke="blue"
+                stroke="white"
                 strokeWidth="2"
               />
             )}
@@ -188,7 +188,7 @@ const ClickToPath = ({
                   width: 10,
                   height: 10,
                   borderRadius: "50%",
-                  backgroundColor: "green",
+                  backgroundColor: "white",
                   pointerEvents: "none",
                 }}
               />

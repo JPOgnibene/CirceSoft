@@ -2,25 +2,24 @@ import React, { useState, useRef, useEffect } from "react";
 import { useTransformContext } from "react-zoom-pan-pinch";
 import GridMap from "./GridMap";
 
-const ClickToPath = ({
-  xMin = 0,
-  xMax = 10,
-  yMin = 0,
-  yMax = 10,
-  pathProgress,
-  path,
-  setPath,
-  FIELD_HEIGHT,
-  FIELD_WIDTH,
-}) => {
-  const [pixels, setPixels] = useState([]);
-  const [mode, setMode] = useState("path"); // NEW: current mode
+const ClickToPath = ({ xMin = 0, xMax = 10, yMin = 0, yMax = 10, 
+  pathProgress, path, setPath}) => {
+  const [dimensions, setDimensions] = useState({ height: 0, width: 0}); //store dimensions of image
+  const [pixels, setPixels] = useState([]); //store pixel points of dots on screen
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 800, height: 600 });
+
+  //watch dimensions for changes from GridMap
+  useEffect(() => {
+    console.log("Dimensions state updated:", dimensions);
+  }, [dimensions]);
 
   // grab zoom state
   const transformContext = useTransformContext();
   const scale = transformContext?.state?.scale ?? 1;
+  const positionX = transformContext?.state?.positionX ?? 1;
+  const positionY = transformContext?.state?.positionY ?? 1;
+  console.log(path?.length)
 
   useEffect(() => {
     const el = containerRef.current;
@@ -50,7 +49,7 @@ const ClickToPath = ({
 
   // Map graph coords to pixels
   const graphToPixel = (dot) => {
-    const { width, height } = size;
+    const { width, height } = dimensions;
     const px = ((dot.x - xMin) / (xMax - xMin)) * width;
     const py = ((yMax - dot.y) / (yMax - yMin)) * height;
     return { px, py };
@@ -88,35 +87,13 @@ const ClickToPath = ({
 
   return (
     <>
-      {/* === MODE TOGGLE === */}
-      <div style={{ marginBottom: "8px" }}>
-        <button
-          onClick={() => setMode("path")}
-          style={{
-            marginRight: "10px",
-            backgroundColor: mode === "path" ? "#4CAF50" : "#ccc",
-            color: "white",
-            padding: "6px 12px",
-            border: "none",
-            borderRadius: "6px",
-          }}
-        >
-          Path Mode
-        </button>
-        <button
-          onClick={() => setMode("obstacle")}
-          style={{
-            backgroundColor: mode === "obstacle" ? "#f44336" : "#ccc",
-            color: "white",
-            padding: "6px 12px",
-            border: "none",
-            borderRadius: "6px",
-          }}
-        >
-          Obstacle Mode
-        </button>
-      </div>
-
+    <div
+      style={{
+        position: "relative",
+        width: `${dimensions.width}px`,
+        height: `${dimensions.height}px`
+      }}
+    >
       <div
         style={{
           position: "relative",
@@ -124,16 +101,7 @@ const ClickToPath = ({
           height: `${FIELD_HEIGHT}px`,
         }}
       >
-        <div
-          style={{
-            width: "100%",
-            height: "95%",
-          }}
-          onClick={handleClick}
-          ref={containerRef}
-        >
-          {/* Pass mode down to GridMap */}
-          <GridMap points={path} mode={mode} />
+        <GridMap points={path} dimensions={dimensions} setDimensions={setDimensions} />
 
           {/* === PATH DRAWING === */}
           <svg

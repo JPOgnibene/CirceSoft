@@ -48,7 +48,7 @@ export default function MapView({ sliderValue, path, setPath }) {
                   objectFit: "cover"
                 }}
               /> */}
-              <ClickToPath pathProgress={sliderValue} path={path} setPath={setPath} FIELD_HEIGHT={FIELD_HEIGHT} FIELD_WIDTH={FIELD_WIDTH} />
+              <ClickToPath pathProgress={sliderValue} path={path} setPath={setPath} />
             </div>
           </TransformComponent>
         )}

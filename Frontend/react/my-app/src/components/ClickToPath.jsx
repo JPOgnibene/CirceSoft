@@ -3,6 +3,10 @@ import { useTransformContext } from "react-zoom-pan-pinch";
 import GridMap from "./GridMap";
 
 const ClickToPath = ({
+  xMin = 0,
+  xMax = 10,
+  yMin = 0,
+  yMax = 10,
   pathProgress,
   path,
   setPath,
@@ -13,22 +17,10 @@ const ClickToPath = ({
   const [mode, setMode] = useState("path"); // NEW: current mode
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 800, height: 600 });
-  const [gridBounds, setGridBounds] = useState(null);
-  const [imgDimensions, setImgDimensions] = useState({ width: 0, height: 0 });
-
-  // Calculate xMin, xMax, yMin, yMax from gridBounds
-  const xMin = 0;
-  const xMax = gridBounds?.maxCols??100;
-  const yMin = 0;
-  const yMax = gridBounds?.maxRows??100;
-  //const xMin = gridBounds.
 
   // grab zoom state
   const transformContext = useTransformContext();
   const scale = transformContext?.state?.scale ?? 1;
-  const positionX = transformContext?.state?.positionX ?? 0;
-  const positionY = transformContext?.state?.positionY ?? 0;
-
 
   useEffect(() => {
     const el = containerRef.current;
@@ -40,14 +32,12 @@ const ClickToPath = ({
     resize();
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
-
   }, []);
 
   // Only handle clicks when in "path" mode
   const handleClick = (e) => {
     if (mode !== "path") return; // prevent path editing in obstacle mode
 
-    console.log("Image dimensions: ", imgDimensions)
     const rect = containerRef.current.getBoundingClientRect();
     const px = e.clientX - rect.left;
     const py = e.clientY - rect.top;
@@ -60,10 +50,7 @@ const ClickToPath = ({
 
   // Map graph coords to pixels
   const graphToPixel = (dot) => {
-    const rect = containerRef.current?.getBoundingClientRect();
-    const width = rect?.width || imgDimensions.width;
-    const height = rect?.height || imgDimensions.height;
-
+    const { width, height } = size;
     const px = ((dot.x - xMin) / (xMax - xMin)) * width;
     const py = ((yMax - dot.y) / (yMax - yMin)) * height;
     return { px, py };
@@ -140,13 +127,13 @@ const ClickToPath = ({
         <div
           style={{
             width: "100%",
-            height: "100%",
+            height: "95%",
           }}
           onClick={handleClick}
           ref={containerRef}
         >
           {/* Pass mode down to GridMap */}
-          <GridMap mode={mode} gridBounds={gridBounds} setGridBounds={setGridBounds} imgDimensions={imgDimensions} setImgDimensions={setImgDimensions} />
+          <GridMap points={path} mode={mode} />
 
           {/* === PATH DRAWING === */}
           <svg

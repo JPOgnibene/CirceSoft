@@ -1,16 +1,32 @@
 import React, { useRef, useState, useEffect } from "react";
 
-const GridMap = ({ mode }) => {   // <--- receive mode prop
+const GridMap = ({ mode, gridBounds, imgDimensions, setGridBounds, setImgDimensions }) => {   // <--- receive mode prop
   const [image, setBackgroundImg] = useState(null);
   const [gridData, setGridData] = useState([]);
   const [obstacles, setObstacles] = useState([]);
-  const [imgDimensions, setImgDimensions] = useState({ width: 0, height: 0 });
+
   const imgRef = useRef(null);
 
   const GRID_ENDPOINT = "http://localhost:8765/grid/coordinates/json";
   const IMAGE_ENDPOINT = "http://localhost:8765/grid/image";
   const OBSTACLE_ENDPOINT = "http://localhost:8765/grid/obstacles";
   const OBSTACLE_JSON_ENDPOINT = "http://localhost:8765/grid/obstacles/json";
+
+  //structure the coordinate mins/maxes, number of rows, and columns
+  useEffect(() => {
+  if (gridData.length > 0) {
+    const bounds = {
+      minX: Math.min(...gridData.map(p => p.x)),
+      maxX: Math.max(...gridData.map(p => p.x)),
+      minY: Math.min(...gridData.map(p => p.y)),
+      maxY: Math.max(...gridData.map(p => p.y)),
+
+      maxRows: Math.max(...gridData.map(p => p.r)),
+      maxCols: Math.max(...gridData.map(p => p.c))
+    };
+    setGridBounds(bounds);
+  }
+}, [gridData]);
 
   // --- Fetch football field image ---
   useEffect(() => {

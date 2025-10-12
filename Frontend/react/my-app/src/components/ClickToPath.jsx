@@ -12,12 +12,15 @@ const ClickToPath = ({
   setPath,
   FIELD_HEIGHT,
   FIELD_WIDTH,
+  imgDimensions,
+  setImgDimensions
 }) => {
   const [pixels, setPixels] = useState([]);
   const [mode, setMode] = useState("path"); // NEW: current mode
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 800, height: 600 });
 
+  const [gridBounds, setGridBounds] = useState(null);
   // grab zoom state
   const transformContext = useTransformContext();
   const scale = transformContext?.state?.scale ?? 1;
@@ -133,7 +136,14 @@ const ClickToPath = ({
           ref={containerRef}
         >
           {/* Pass mode down to GridMap */}
-          <GridMap points={path} mode={mode} />
+          <GridMap 
+            points={path} 
+            mode={mode}
+            gridBounds={gridBounds}
+            imgDimensions={imgDimensions}
+            setGridBounds={setGridBounds} 
+            setImgDimensions={setImgDimensions} 
+          />
 
           {/* === PATH DRAWING === */}
           <svg

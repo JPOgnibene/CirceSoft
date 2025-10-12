@@ -10,10 +10,9 @@ const ClickToPath = ({
   pathProgress,
   path,
   setPath,
-  FIELD_HEIGHT,
-  FIELD_WIDTH,
   imgDimensions,
-  setImgDimensions
+  setImgDimensions,
+  image
 }) => {
   const [pixels, setPixels] = useState([]);
   const [mode, setMode] = useState("path"); // NEW: current mode
@@ -123,8 +122,8 @@ const ClickToPath = ({
       <div
         style={{
           position: "relative",
-          width: `${FIELD_WIDTH}px`,
-          height: `${FIELD_HEIGHT}px`,
+          width: `${imgDimensions.width}px`,
+          height: `${imgDimensions.height}px`,
         }}
       >
         <div
@@ -143,6 +142,7 @@ const ClickToPath = ({
             imgDimensions={imgDimensions}
             setGridBounds={setGridBounds} 
             setImgDimensions={setImgDimensions} 
+            image={image}
           />
 
           {/* === PATH DRAWING === */}

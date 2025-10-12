@@ -1,7 +1,13 @@
 import React, { useRef, useState, useEffect } from "react";
 
-const GridMap = ({ mode, gridBounds, imgDimensions, setGridBounds, setImgDimensions }) => {   // <--- receive mode prop
-  const [image, setBackgroundImg] = useState(null);
+const GridMap = ({ 
+  mode, 
+  gridBounds, 
+  imgDimensions, 
+  image, 
+  setGridBounds, 
+}) => {   // <--- receive mode prop
+
   const [gridData, setGridData] = useState([]);
   const [obstacles, setObstacles] = useState([]);
 
@@ -27,23 +33,6 @@ const GridMap = ({ mode, gridBounds, imgDimensions, setGridBounds, setImgDimensi
     setGridBounds(bounds);
   }
 }, [gridData]);
-
-  // --- Fetch football field image ---
-  useEffect(() => {
-    const fetchImage = async () => {
-      try {
-        const response = await fetch(IMAGE_ENDPOINT);
-        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
-        const blob = await response.blob();
-        const imageUrl = URL.createObjectURL(blob);
-        setBackgroundImg(imageUrl);
-      } catch (error) {
-        console.error("Failed to fetch map background:", error);
-        setBackgroundImg("/imagefrombackend/aerialview.png");
-      }
-    };
-    fetchImage();
-  }, []);
 
   // --- Fetch grid coordinates ---
   useEffect(() => {
@@ -74,14 +63,6 @@ const GridMap = ({ mode, gridBounds, imgDimensions, setGridBounds, setImgDimensi
     };
     fetchObstacles();
   }, []);
-
-  // --- Get image dimensions ---
-  const handleImageLoad = () => {
-    if (imgRef.current) {
-      const { naturalWidth, naturalHeight } = imgRef.current;
-      setImgDimensions({ width: naturalWidth, height: naturalHeight });
-    }
-  };
 
   // --- Determine if cell is an obstacle ---
   const isObstacle = (r, c) => obstacles.some((obs) => obs.r === r && obs.c === c);
@@ -140,7 +121,6 @@ const GridMap = ({ mode, gridBounds, imgDimensions, setGridBounds, setImgDimensi
           ref={imgRef}
           src={image}
           alt="Football Field"
-          onLoad={handleImageLoad}
           style={{
             width: "100%",
             height: "auto",

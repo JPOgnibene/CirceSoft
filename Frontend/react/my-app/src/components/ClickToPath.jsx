@@ -11,15 +11,10 @@ const ClickToPath = ({
   image
 }) => {
   const [mode, setMode] = useState("path"); // NEW: current mode
-  const [xMin, setXMin] = useState(0);
-  const [xMax, setXMax] = useState(imgDimensions.width);
-  const [yMin, setYMin] = useState(0);
-  const [yMax, setYMax] = useState(imgDimensions.height);
-
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 800, height: 600 });
-
   const [gridBounds, setGridBounds] = useState(null);
+
   // grab zoom state
   const transformContext = useTransformContext();
   const scale = transformContext?.state?.scale ?? 1;
@@ -35,7 +30,7 @@ const ClickToPath = ({
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
   }, []);
-  
+
   // Only handle clicks when in "path" mode
   const handleClick = (e) => {
     if (mode !== "path") return; // prevent path editing in obstacle mode
@@ -55,19 +50,16 @@ const ClickToPath = ({
       (imgDimensions.height-py) < gridBounds.minPY || 
       (imgDimensions.height-py) > gridBounds.maxPY
     ){
-      
-      const reasons = [];
-      if (px < gridBounds.minPX) reasons.push(`px(${px.toFixed(1)}) < minPX(${gridBounds.minPX})`);
-      if (px > gridBounds.maxPX) reasons.push(`px(${px.toFixed(1)}) > maxPX(${gridBounds.maxPX})`);
-      if (py < (imgDimensions.height-gridBounds.minPY)) reasons.push(`py(${py.toFixed(1)}) < minPY(${(imgDimensions.height-gridBounds.minPY).toFixed(1)})`);
-      if (py > (imgDimensions.height-gridBounds.maxPY)) reasons.push(`py(${py.toFixed(1)}) > maxPY(${(imgDimensions.height-gridBounds.maxPY).toFixed(1)})`);
-  
-    console.log(`Click at ${px.toFixed(1)}, ${py.toFixed(1)} is outside grid bounds - ${reasons.join(' AND ')}`);
+      console.log(`Click at ${px.toFixed(1)}, ${py.toFixed(1)} is outside grid bounds`);
       return;
     }
-
-    const xCoord = xMin + (clickX / rect.width) * (xMax - xMin);
-    const yCoord = yMax - (clickY / rect.height) * (yMax - yMin);
+    
+    const xCoord = ((px - gridBounds.minPX) / (gridBounds.maxPX - gridBounds.minPX)) * gridBounds.maxCols;
+    //const xCoord = xMin + (clickX / rect.width) * (xMax - xMin);
+    
+    const pyFlipped = imgDimensions.height - py;
+    const yCoord = ((pyFlipped - gridBounds.minPY) / (gridBounds.maxPY - gridBounds.minPY)) * gridBounds.maxRows;
+    //const yCoord = yMax - (clickY / rect.height) * (yMax - yMin);
 
     console.log("Path set at (", xCoord, ", ", yCoord,")")
     setPath((p) => [...p, { x: xCoord, y: yCoord }]);
@@ -76,8 +68,21 @@ const ClickToPath = ({
   // Map graph coords to pixels
   const graphToPixel = (dot) => {
     const { width, height } = size;
-    const px = ((dot.x - xMin) / (xMax - xMin)) * width;
-    const py = ((yMax - dot.y) / (yMax - yMin)) * height;
+    //const px = ((dot.x - xMin) / (xMax - xMin)) * width;
+    //const py = ((yMax - dot.y) / (yMax - yMin)) * height;
+
+    if (!gridBounds) {
+      // Fallback to center if grid bounds not loaded
+      return { px: width / 2, py: height / 2 };
+    }
+    
+    // Convert grid coordinates back to pixel coordinates on image
+    const imgX = gridBounds.minPX + (dot.x / gridBounds.maxCols) * (gridBounds.maxPX - gridBounds.minPX);
+    const imgY = gridBounds.minPY + (dot.y / gridBounds.maxRows) * (gridBounds.maxPY - gridBounds.minPY);
+    
+    // Convert image pixel coordinates to screen coordinates
+    const px = (imgX / imgDimensions.width) * width;
+    const py = ((imgDimensions.height - imgY) / imgDimensions.height) * height;
     return { px, py };
   };
 

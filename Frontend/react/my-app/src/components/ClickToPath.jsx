@@ -61,8 +61,12 @@ const ClickToPath = ({
     const yCoord = ((pyFlipped - gridBounds.minPY) / (gridBounds.maxPY - gridBounds.minPY)) * gridBounds.maxRows;
     //const yCoord = yMax - (clickY / rect.height) * (yMax - yMin);
 
-    console.log("Path set at (", xCoord, ", ", yCoord,")")
-    setPath((p) => [...p, { x: xCoord, y: yCoord }]);
+    //Math.round snaps the coords to row/column by rounding
+    console.log("Path set at (", xCoord, ", ", xCoord, ")")
+    setPath((p) => [...p, { 
+      x: Math.round(xCoord), 
+      y: Math.round(yCoord)
+      }]);
   };
 
   // Map graph coords to pixels
@@ -75,7 +79,7 @@ const ClickToPath = ({
       // Fallback to center if grid bounds not loaded
       return { px: width / 2, py: height / 2 };
     }
-    
+
     // Convert grid coordinates back to pixel coordinates on image
     const imgX = gridBounds.minPX + (dot.x / gridBounds.maxCols) * (gridBounds.maxPX - gridBounds.minPX);
     const imgY = gridBounds.minPY + (dot.y / gridBounds.maxRows) * (gridBounds.maxPY - gridBounds.minPY);

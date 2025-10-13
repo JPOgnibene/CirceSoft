@@ -22,10 +22,10 @@ const GridMap = ({
   useEffect(() => {
   if (gridData.length > 0) {
     const bounds = {
-      minX: Math.min(...gridData.map(p => p.x)),
-      maxX: Math.max(...gridData.map(p => p.x)),
-      minY: Math.min(...gridData.map(p => p.y)),
-      maxY: Math.max(...gridData.map(p => p.y)),
+      minPX: Math.min(...gridData.map(p => p.x)),
+      maxPX: Math.max(...gridData.map(p => p.x)),
+      minPY: Math.min(...gridData.map(p => p.y)),
+      maxPY: Math.max(...gridData.map(p => p.y)),
 
       maxRows: Math.max(...gridData.map(p => p.r)),
       maxCols: Math.max(...gridData.map(p => p.c))

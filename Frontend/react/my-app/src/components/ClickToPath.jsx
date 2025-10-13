@@ -3,10 +3,6 @@ import { useTransformContext } from "react-zoom-pan-pinch";
 import GridMap from "./GridMap";
 
 const ClickToPath = ({
-  xMin = 0,
-  xMax = 10,
-  yMin = 0,
-  yMax = 10,
   pathProgress,
   path,
   setPath,
@@ -14,8 +10,12 @@ const ClickToPath = ({
   setImgDimensions,
   image
 }) => {
-  const [pixels, setPixels] = useState([]);
   const [mode, setMode] = useState("path"); // NEW: current mode
+  const [xMin, setXMin] = useState(0);
+  const [xMax, setXMax] = useState(imgDimensions.width);
+  const [yMin, setYMin] = useState(0);
+  const [yMax, setYMax] = useState(imgDimensions.height);
+
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 800, height: 600 });
 
@@ -35,18 +35,41 @@ const ClickToPath = ({
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
   }, []);
-
+  
   // Only handle clicks when in "path" mode
   const handleClick = (e) => {
     if (mode !== "path") return; // prevent path editing in obstacle mode
 
+    //getBoundingClientRec gets container's position/size on screen
     const rect = containerRef.current.getBoundingClientRect();
-    const px = e.clientX - rect.left;
-    const py = e.clientY - rect.top;
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
 
-    const xCoord = xMin + (px / rect.width) * (xMax - xMin);
-    const yCoord = yMax - (py / rect.height) * (yMax - yMin);
+    //get pixel coords
+    const px = (clickX / rect.width) * imgDimensions.width;
+    const py = (clickY / rect.height) * imgDimensions.height;
 
+    if (
+      px < gridBounds.minPX || 
+      px > gridBounds.maxPX || 
+      (imgDimensions.height-py) < gridBounds.minPY || 
+      (imgDimensions.height-py) > gridBounds.maxPY
+    ){
+      
+      const reasons = [];
+      if (px < gridBounds.minPX) reasons.push(`px(${px.toFixed(1)}) < minPX(${gridBounds.minPX})`);
+      if (px > gridBounds.maxPX) reasons.push(`px(${px.toFixed(1)}) > maxPX(${gridBounds.maxPX})`);
+      if (py < (imgDimensions.height-gridBounds.minPY)) reasons.push(`py(${py.toFixed(1)}) < minPY(${(imgDimensions.height-gridBounds.minPY).toFixed(1)})`);
+      if (py > (imgDimensions.height-gridBounds.maxPY)) reasons.push(`py(${py.toFixed(1)}) > maxPY(${(imgDimensions.height-gridBounds.maxPY).toFixed(1)})`);
+  
+    console.log(`Click at ${px.toFixed(1)}, ${py.toFixed(1)} is outside grid bounds - ${reasons.join(' AND ')}`);
+      return;
+    }
+
+    const xCoord = xMin + (clickX / rect.width) * (xMax - xMin);
+    const yCoord = yMax - (clickY / rect.height) * (yMax - yMin);
+
+    console.log("Path set at (", xCoord, ", ", yCoord,")")
     setPath((p) => [...p, { x: xCoord, y: yCoord }]);
   };
 
@@ -129,7 +152,7 @@ const ClickToPath = ({
         <div
           style={{
             width: "100%",
-            height: "95%",
+            height: "100%",
           }}
           onClick={handleClick}
           ref={containerRef}

@@ -11,3 +11,4 @@ errorCode=0
 cableDispenseStatus=0
 cableDispenseCommand=0
 SequenceNum=0
+isMoving=true

@@ -6,6 +6,7 @@ const GridMap = ({
   imgDimensions, 
   image, 
   setGridBounds, 
+  messageBoxRef,
 }) => {   // <--- receive mode prop
 
   const [gridData, setGridData] = useState([]);
@@ -74,13 +75,16 @@ const GridMap = ({
 
     const { r, c } = point;
     let updatedObstacles;
+    let added = true;
 
     if (isObstacle(r, c)) {
       updatedObstacles = obstacles.filter((obs) => !(obs.r === r && obs.c === c));
       console.log(`Removing obstacle at (r=${r}, c=${c})`);
+      added = false;
     } else {
       updatedObstacles = [...obstacles, { r, c }];
       console.log(`Adding obstacle at (r=${r}, c=${c})`);
+      added = true;
     }
 
     setObstacles(updatedObstacles);
@@ -95,6 +99,12 @@ const GridMap = ({
       const result = await response.json();
       if (!response.ok) throw new Error(`Failed: ${result.error || response.statusText}`);
       console.log("Obstacles updated:", result);
+
+      if (messageBoxRef?.current) {
+        if (added) messageBoxRef.current.addMessage('success', `Obstacles added at (${r}, ${c})`);
+        else messageBoxRef.current.addMessage('info', `Obstacle removed at (${r}, ${c})`);
+      }
+      
     } catch (error) {
       console.error("Error updating obstacles:", error);
     }

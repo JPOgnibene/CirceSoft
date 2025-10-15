@@ -8,7 +8,8 @@ const ClickToPath = ({
   setPath,
   imgDimensions,
   setImgDimensions,
-  image
+  image,
+  messageBoxRef,
 }) => {
   const [mode, setMode] = useState("path"); // NEW: current mode
   const containerRef = useRef(null);
@@ -175,6 +176,7 @@ const ClickToPath = ({
             setGridBounds={setGridBounds} 
             setImgDimensions={setImgDimensions} 
             image={image}
+            messageBoxRef={messageBoxRef}
           />
 
           {/* === PATH DRAWING === */}

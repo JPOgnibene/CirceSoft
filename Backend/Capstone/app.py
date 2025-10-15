@@ -11,6 +11,7 @@ from fastapi.responses import PlainTextResponse, FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import uvicorn
+import math
 
 # Assuming 'receiver' and 'protos' are available in your environment
 # from receiver import handle_client_message
@@ -31,17 +32,38 @@ class circesoft_pb2:
             self.SequenceNum = kwargs.get('SequenceNum', 0)
             self.isMoving = kwargs.get('isMoving', False)
 
+# Compute euclidian distance bw two points
+def calculate_distance(p1: Tuple[float, float], p2: Tuple[float, float]) -> float:
+    dx = p2[0] - p1[0]
+    dy = p2[1] - p1[1]
+    return math.sqrt(dx*dx + dy*dy)
+
+
 def handle_client_message(data) -> circesoft_pb2.CurrentStatus:
-    # Dummy implementation for required imports
+    # Handles incoming status message, updates cable length, returns complete status object
+    global CABLE_REMAINING, LAST_POSITION_ECI
+
+    p1 = LAST_POSITION_ECI
+
     msg = circesoft_pb2.CurrentStatus()
-    X_ECI = msg.reportedPosition.X_ECI
-    Y_ECI = msg.reportedPosition.Y_ECI
+    new_X_ECI = msg.reportedPosition.X_ECI
+    new_Y_ECI = msg.reportedPosition.Y_ECI
+
+    p2 = (new_X_ECI, new_Y_ECI)
+
+    distance_traveled = calculate_distance(p1, p2)
+    CABLE_REMAINING -= distance_traveled
+    if CABLE_REMAINING < 0:
+        CABLE_REMAINING = 0
+
+    LAST_POSITION_ECI = p2
 
     position_for_detector = {
-        'latitude': X_ECI,
-        'longitude': Y_ECI
+        'latitude': new_X_ECI,
+        'longitude': new_Y_ECI
     }
     msg.isMoving = is_bot_moving(position_for_detector)
+    msg.reportedCableRemaining_m = CABLE_REMAINING
     return msg
 
 def is_bot_moving(position_for_detector: Dict[str, float]) -> bool:
@@ -66,6 +88,11 @@ GRID_IMAGE_PATH = os.path.join(GRID_DIR, GRID_IMAGE_NAME)
 GRID_COORDS_PATH = os.path.join(GRID_DIR, GRID_COORDS_NAME)
 GRID_OBS_PATH = os.path.join(GRID_DIR, GRID_OBS_NAME)
 GRID_WAYPOINTS_PATH = os.path.join(GRID_DIR, GRID_WAYPOINTS_NAME) # New waypoint path
+
+INITIAL_LENGTH = 50.0 # state variable for cable length 
+
+CABLE_REMAINING = INITIAL_LENGTH
+LAST_POSITION_ECI: Tuple[float, float] = (0.0, 0.0)
 
 app = FastAPI(title="CirceSoft Control Server", version="1.0")
 

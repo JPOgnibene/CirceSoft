@@ -2,7 +2,7 @@ import React from "react";
 
 const DIRECTIONS_API = "http://localhost:8765/directions";
 
-function EmergencyStop() {
+function EmergencyStop({ messageBoxRef }) {
   const emergencyStop = async () => {
     try {
       const response = await fetch(DIRECTIONS_API, {
@@ -17,10 +17,14 @@ function EmergencyStop() {
 
       const result = await response.text();
       console.log("Emergency STOP sent:", result);
-      alert("🚨 EMERGENCY STOP issued!");
+      if (messageBoxRef?.current) {
+        messageBoxRef.current.addMessage('warning', 'Emergency STOP command sent to the bot');
+      }
     } catch (error) {
       console.error("Error sending STOP:", error);
-      alert("Failed to send STOP");
+      if (messageBoxRef?.current) {
+        messageBoxRef.current.addMessage('error', `Failed to send STOP: ${error.message}`);
+      }
     }
   };
 

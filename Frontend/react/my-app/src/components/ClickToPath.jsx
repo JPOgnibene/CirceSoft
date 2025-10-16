@@ -52,6 +52,9 @@ const ClickToPath = ({
       (imgDimensions.height-py) > gridBounds.maxPY
     ){
       console.log(`Click at ${px.toFixed(1)}, ${py.toFixed(1)} is outside grid bounds`);
+      if (messageBoxRef?.current) {
+        messageBoxRef.current.addMessage('error', 'Click is outside grid bounds');
+      }
       return;
     }
     
@@ -64,6 +67,9 @@ const ClickToPath = ({
 
     //Math.round snaps the coords to row/column by rounding
     console.log("Path set at (", xCoord, ", ", xCoord, ")")
+    if (messageBoxRef?.current) {
+      messageBoxRef.current.addMessage('success', `Waypoint added at (${Math.round(xCoord)}, ${Math.round(yCoord)})`);
+    }
     setPath((p) => [...p, { 
       x: Math.round(xCoord), 
       y: Math.round(yCoord)

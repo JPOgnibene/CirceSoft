@@ -9,11 +9,7 @@ This version includes:
 - ASCII rendering with safety toggles
 - Writes unreachable cells (w.r.t. start and movement model) back to obstacles.csv
 - Exports the computed path to a hardcoded path.csv
-
-CSV FORMAT (both files):
-- First two columns are treated as headers: row, col  (0-based)
-- Additional columns are ignored
-- "row" = y, "col" = x
+- NEW: Keeps one-cell clearance from obstacles by inflating obstacles by 1 cell (8-neighborhood)
 """
 
 import argparse, math, sys, os
@@ -133,11 +129,15 @@ def path_length(path: Optional[List[Coord]]) -> float:
 
 def render_ascii(width: int, height: int, start: Coord, goal: Coord,
                  blocked: Set[Coord], valid: Set[Coord], path: Optional[List[Coord]],
-                 *, ascii_safe: bool=False, outside_space: bool=False) -> str:
+                 *, ascii_safe: bool=False, outside_space: bool=False,
+                 buffer: Optional[Set[Coord]] = None) -> str:
     """
     outside_space=False (default): prints '.' for cells outside the grid mask (solid rectangle).
     ascii_safe=True: uses '*' instead of '•' for path.
+    '#' = actual obstacles (persisted)
+    '+' = safety buffer (inflated, not persisted)
     """
+    buffer = buffer or set()
     dot_outside = ' ' if outside_space else '.'
     path_char = '*' if ascii_safe else '•'
     pathset = set(path or [])
@@ -150,13 +150,20 @@ def render_ascii(width: int, height: int, start: Coord, goal: Coord,
                 ch = dot_outside
             else:
                 ch = '.'
-                if p in blocked: ch = '#'
-                elif p in pathset: ch = path_char
+                if p in blocked:
+                    ch = '#'
+                elif p in buffer:
+                    ch = '+'
+                elif p in pathset:
+                    ch = path_char
                 if p == start: ch = 'S'
                 if p == goal:  ch = 'G'
             line.append(ch)
         rows.append("".join(line))
-    legend = f"Legend: S=start  G=goal  #=blocked  {path_char}=path  .=free   (grid {width}x{height}, masked)"
+    legend = (
+        f"Legend: S=start  G=goal  #=obstacle  +=buffer  {path_char}=path  .=free   "
+        f"(grid {width}x{height}, masked)"
+    )
     return "\n".join(rows + [legend])
 
 def render_png(outfile: str,
@@ -165,16 +172,24 @@ def render_png(outfile: str,
                blocked: Set[Coord], valid: Set[Coord],
                path: Optional[List[Coord]],
                *, dpi: int=140, cell_size: int=16,
-               show_grid: bool=False, show_legend: bool=True) -> None:
+               show_grid: bool=False, show_legend: bool=True,
+               buffer: Optional[Set[Coord]] = None) -> None:
     if not _MATPLOTLIB_AVAILABLE:
         raise RuntimeError("matplotlib not available. Install it to use --png-out.")
 
-    img = np.zeros((height, width), dtype=np.uint8)   # 0 background, 1 free, 2 blocked
+    buffer = buffer or set()
+    # 0 background, 1 free, 2 obstacle, 3 buffer
+    img = np.zeros((height, width), dtype=np.uint8)
     for (x, y) in valid: img[y, x] = 1
     for (x, y) in blocked:
         if 0 <= x < width and 0 <= y < height: img[y, x] = 2
+    for (x, y) in buffer:
+        if 0 <= x < width and 0 <= y < height and img[y, x] != 2:
+            img[y, x] = 3
 
-    cmap = ListedColormap(["#d9d9d9", "#ffffff", "#000000"])
+    from matplotlib.colors import ListedColormap
+    cmap = ListedColormap(["#d9d9d9", "#ffffff", "#000000", "#7f7f7f"])  # bg, free, obstacle, buffer
+
     px_w, px_h = max(1, width*cell_size), max(1, height*cell_size)
     fig_w, fig_h = px_w/dpi, px_h/dpi
     fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=dpi)
@@ -195,18 +210,21 @@ def render_png(outfile: str,
         for y in range(height+1): ax.axhline(y-0.5, linewidth=0.5)
 
     if show_legend:
-        bg = mpatches.Patch(color="#d9d9d9", label="Outside Mask")
+        import matplotlib.patches as mpatches
+        bg   = mpatches.Patch(color="#d9d9d9", label="Outside Mask")
         free = mpatches.Patch(color="#ffffff", label="Free")
-        obs  = mpatches.Patch(color="#000000", label="Blocked")
+        obs  = mpatches.Patch(color="#000000", label="Obstacle")
+        buf  = mpatches.Patch(color="#7f7f7f", label="Buffer")
         line = plt.Line2D([0], [0], lw=max(2, cell_size//5), label='Path')
         spt  = plt.Line2D([0], [0], marker='o', linestyle='None', label='Start', markersize=8)
         gpt  = plt.Line2D([0], [0], marker='X', linestyle='None', label='Goal', markersize=8)
-        ax.legend(handles=[bg, free, obs, line, spt, gpt], loc='lower right', framealpha=0.7)
+        ax.legend(handles=[bg, free, obs, buf, line, spt, gpt], loc='lower right', framealpha=0.7)
 
     ax.set_aspect('equal'); ax.set_xticks([]); ax.set_yticks([])
     fig.tight_layout(pad=0); fig.savefig(outfile, bbox_inches="tight"); plt.close(fig)
 
-# ------------------------- New: reachability + I/O helpers -------------------------
+
+# ------------------------- New: reachability / inflation / I/O helpers -------------------------
 
 def _compute_reachable(width: int, height: int, start: Coord,
                        blocked: Set[Coord], valid: Set[Coord],
@@ -231,6 +249,25 @@ def _compute_reachable(width: int, height: int, start: Coord,
             stack.append(p)
     return seen
 
+def inflate_obstacles(blocked: Set[Coord], valid: Set[Coord], width: int, height: int, radius: int = 1) -> Set[Coord]:
+    """
+    Inflate obstacles by Chebyshev radius (default 1). This ensures the path keeps at least
+    one cell away in all directions. Only inflates into valid cells and within bounds.
+    """
+    if radius <= 0:
+        return set(blocked)
+    inflated = set(blocked)
+    # All displacements with Chebyshev distance <= radius
+    deltas = [(dx, dy) for dx in range(-radius, radius+1)
+                       for dy in range(-radius, radius+1)]
+    for (ox, oy) in list(blocked):
+        for dx, dy in deltas:
+            nx, ny = ox + dx, oy + dy
+            p = (nx, ny)
+            if 0 <= nx < width and 0 <= ny < height and p in valid:
+                inflated.add(p)
+    return inflated
+
 def _update_obstacles_csv(obstacles_df: pd.DataFrame, new_obstacles: Set[Coord]) -> None:
     """
     Merge new (x,y) obstacles into obstacles_df (using only first two columns as row,col) and write back
@@ -243,7 +280,6 @@ def _update_obstacles_csv(obstacles_df: pd.DataFrame, new_obstacles: Set[Coord])
         columns=["row", "col"]
     )
     merged = pd.concat([core, add_rows], ignore_index=True).drop_duplicates(subset=["row", "col"])
-    # Keep only row,col (first two) as required
     merged = merged[["row", "col"]]
     merged.to_csv(OBSTACLES_CSV_PATH, index=False)
 
@@ -286,56 +322,87 @@ def main(argv: List[str]) -> int:
     obs_df = pd.read_csv(OBSTACLES_CSV_PATH)
     obs_rc = obs_df.iloc[:, :2]
 
-    valid: Set[Coord] = set((int(c), int(r)) for r, c in zip(grid_rc.iloc[:,0], grid_rc.iloc[:,1]))
-    blocked_raw: Set[Coord] = set((int(c), int(r)) for r, c in zip(obs_rc.iloc[:,0], obs_rc.iloc[:,1]))
-    blocked = set(pt for pt in blocked_raw if pt in valid)
+    # Valid mask and original obstacles
+    valid: Set[Coord] = set((int(c), int(r)) for r, c in zip(grid_rc.iloc[:, 0], grid_rc.iloc[:, 1]))
+    blocked_raw: Set[Coord] = set((int(c), int(r)) for r, c in zip(obs_rc.iloc[:, 0], obs_rc.iloc[:, 1]))
+    base_blocked: Set[Coord] = set(pt for pt in blocked_raw if pt in valid)  # persisted obstacles only
 
     if not valid:
         print("Grid CSV produced an empty set of valid cells.", file=sys.stderr)
         return 2
 
     # Bounds from valid set (image space is 0..max)
-    min_x, min_y = min(x for x,_ in valid), min(y for _,y in valid)
-    max_x, max_y = max(x for x,_ in valid), max(y for _,y in valid)
-    width, height = max_x+1, max_y+1
+    min_x, min_y = min(x for x, _ in valid), min(y for _, y in valid)
+    max_x, max_y = max(x for x, _ in valid), max(y for _, y in valid)
+    width, height = max_x + 1, max_y + 1
 
     # Start / Goal defaults
-    if args.start_rc: start = parse_rc(args.start_rc)
-    elif args.start:   start = parse_xy(args.start)
-    else:              start = (min_x, min_y)
+    if args.start_rc:
+        start = parse_rc(args.start_rc)
+    elif args.start:
+        start = parse_xy(args.start)
+    else:
+        start = (min_x, min_y)
 
-    if args.goal_rc:   goal = parse_rc(args.goal_rc)
-    elif args.goal:    goal = parse_xy(args.goal)
-    else:              goal = (max_x, max_y)
+    if args.goal_rc:
+        goal = parse_rc(args.goal_rc)
+    elif args.goal:
+        goal = parse_xy(args.goal)
+    else:
+        goal = (max_x, max_y)
 
-    # --- fill unreachable cells as obstacles and persist back to obstacles.csv
-    reachable = _compute_reachable(width, height, start, blocked, valid, diagonal=args.diagonal)
-    newly_unreachable: Set[Coord] = {p for p in valid if (p not in blocked) and (p not in reachable)}
+    # 1) Mark unreachable cells (w.r.t. start, movement model) as obstacles and persist
+    reachable = _compute_reachable(width, height, start, base_blocked, valid, diagonal=args.diagonal)
+    newly_unreachable: Set[Coord] = {p for p in valid if (p not in base_blocked) and (p not in reachable)}
     if newly_unreachable:
-        blocked |= newly_unreachable  # update in-memory view
+        base_blocked |= newly_unreachable
         _update_obstacles_csv(obs_df, newly_unreachable)
         print(f"[info] Marked {len(newly_unreachable)} unreachable cells as obstacles and updated obstacles.csv")
 
-    # Run A*
-    path = astar(width, height, start, goal, blocked, valid, diagonal=args.diagonal)
+    # 2) Inflate obstacles by 1 cell for safety buffer (NOT persisted)
+    inflated_blocked: Set[Coord] = inflate_obstacles(base_blocked, valid, width, height, radius=1)
+    buffer_only: Set[Coord] = inflated_blocked - base_blocked  # show as '+' in ASCII / gray in PNG
 
-    # ASCII (even if no path)
+    # 3) Run A* using the inflated obstacle set
+    path = astar(width, height, start, goal, inflated_blocked, valid, diagonal=args.diagonal)
+
+    # 4) ASCII (render even if no path found)
     if not args.no_map:
-        print(render_ascii(width, height, start, goal, blocked, valid, path,
-                           ascii_safe=args.ascii_safe, outside_space=args.outside_space))
+        print(
+            render_ascii(
+                width, height, start, goal,
+                base_blocked,         # real (persisted) obstacles
+                valid,
+                path,
+                ascii_safe=args.ascii_safe,
+                outside_space=args.outside_space,
+                buffer=buffer_only     # safety buffer overlay
+            )
+        )
 
-    # PNG (even if no path)
+    # 5) PNG (render even if no path found)
     if args.png_out:
-        render_png(args.png_out, width, height, start, goal, blocked, valid, path,
-                   dpi=args.dpi, cell_size=args.cell_size,
-                   show_grid=args.grid_lines, show_legend=not args.no_legend)
+        render_png(
+            args.png_out, width, height, start, goal,
+            base_blocked,            # real obstacles
+            valid,
+            path,
+            dpi=args.dpi, cell_size=args.cell_size,
+            show_grid=args.grid_lines, show_legend=not args.no_legend,
+            buffer=buffer_only
+        )
         print(f"[info] PNG saved: {args.png_out}")
 
+    # 6) Path reporting / CSV
     if path is None:
+        # Helpful hints if start/goal fell inside the safety buffer
+        if start in buffer_only and start not in base_blocked:
+            print("[hint] Start is inside the 1-cell safety buffer. Move it at least 1 cell away from obstacles.")
+        if goal in buffer_only and goal not in base_blocked:
+            print("[hint] Goal is inside the 1-cell safety buffer. Move it at least 1 cell away from obstacles.")
         print("No path found.")
         return 1
 
-    # Print stats and write path.csv
     length = path_length(path)
     print(f"Path length: {length:.3f}")
     print(f"Start: {start}  Goal: {goal}")
@@ -343,6 +410,7 @@ def main(argv: List[str]) -> int:
     write_path_csv(path)
 
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))

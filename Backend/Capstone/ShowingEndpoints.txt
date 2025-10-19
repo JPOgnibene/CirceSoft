@@ -1,3 +1,7 @@
+# ==============================================================================
+# UPDATED CURL COMMANDS (USING /grid/path)
+# ==============================================================================
+
 # Health Check
 curl -X GET http://localhost:8765/health
 
@@ -13,8 +17,8 @@ curl -X PUT -H "Content-Type: text/plain" -d "MOVE FORWARD 10" http://localhost:
 # Get Grid Manifest
 curl -X GET http://localhost:8765/grid/manifest
 
-# Get Grid Image (Saves file as current_image.png)
-curl -X GET http://localhost:8765/grid/image --output current_image.png
+# Get Grid Image (Saves file as current_image.jpg)
+curl -X GET http://localhost:8765/grid/image --output current_image.jpg
 
 # Get Grid Coordinates (Saves file as grid_coordinates.csv)
 curl -X GET http://localhost:8765/grid/coordinates --output grid_coordinates.csv
@@ -22,84 +26,178 @@ curl -X GET http://localhost:8765/grid/coordinates --output grid_coordinates.csv
 # Get Grid Obstacles (Saves file as obstacles.csv)
 curl -X GET http://localhost:8765/grid/obstacles --output obstacles.csv
 
-# Get Grid Bundle (Saves file with generated name, e.g., grid_bundle_20250925-133230.zip)
-# Note: The output filename includes a timestamp, so you'll need to check the exact name or force one.
-curl -X GET http://localhost:8765/grid/bundle --remote-header-name --remote-name
-# Alternative for a fixed name:
-# curl -X GET http://localhost:8765/grid/bundle --output grid_bundle.zip
+# Get Grid Path (Saves file as path.csv)
+curl -X GET http://localhost:8765/grid/path --output path.csv
 
+# Get Grid Path JSON
+curl -X GET http://localhost:8765/grid/path/json
+
+# Put Grid Path (Example: sending a new path list)
+curl -X PUT -H "Content-Type: application/json" -d '[{"r": 5, "c": 5}, {"r": 6, "c": 6}]' http://localhost:8765/grid/path
+
+# Get Grid Obstacles JSON
+curl -X GET http://localhost:8765/grid/obstacles/json
+
+# Put Grid Obstacles (Example: sending a new obstacle list)
+curl -X PUT -H "Content-Type: application/json" -d '[{"r": 1, "c": 1}, {"r": 2, "c": 2}]' http://localhost:8765/grid/obstacles
+
+# Get Grid Bundle (Saves file with generated name, e.g., grid_bundle_20250925-133230.zip)
+curl -X GET http://localhost:8765/grid/bundle --remote-header-name --remote-name
+
+
+# ==============================================================================
+# UPDATED JAVASCRIPT CLIENT DEMO (USING /grid/path)
+# ==============================================================================
 
 const BASE_URL = "http://localhost:8765";
 
 // /health
 async function getHealth() {
-  const response = await fetch(`${BASE_URL}/health`);
-  return await response.text();
+    const response = await fetch(`${BASE_URL}/health`);
+    return await response.text();
 }
 
 // /current-values
 async function getCurrentValues() {
-  const response = await fetch(`${BASE_URL}/current-values`);
-  return await response.text();
+    const response = await fetch(`${BASE_URL}/current-values`);
+    return await response.text();
 }
 
 // /directions
 async function getDirections() {
-  const response = await fetch(`${BASE_URL}/directions`);
-  return await response.text();
+    const response = await fetch(`${BASE_URL}/directions`);
+    return await response.text();
 }
 
 // /grid/manifest
 async function getGridManifest() {
-  const response = await fetch(`${BASE_URL}/grid/manifest`);
-  return await response.json();
+    const response = await fetch(`${BASE_URL}/grid/manifest`);
+    return await response.json();
 }
 
-// /grid/image, /grid/coordinates, /grid/obstacles, /grid/bundle
-// These typically return a file. They can be fetched and then processed (e.g., as a Blob or ArrayBuffer)
+// /grid/coordinates/json
+async function getGridCoordinatesJson() {
+    const response = await fetch(`${BASE_URL}/grid/coordinates/json`);
+    return await response.json();
+}
+
+// /grid/obstacles/json
+async function getGridObstaclesJson() {
+    const response = await fetch(`${BASE_URL}/grid/obstacles/json`);
+    return await response.json();
+}
+
+// /grid/path/json (UPDATED)
+async function getGridPathJson() {
+    const response = await fetch(`${BASE_URL}/grid/path/json`);
+    return await response.json();
+}
+
+// /grid/image, /grid/coordinates, /grid/obstacles, /grid/path, /grid/bundle
+// These typically return a file.
 async function getFile(endpoint) {
-  const response = await fetch(`${BASE_URL}${endpoint}`);
-  if (response.ok) {
-    // For images/ZIP/CSV, you might want a Blob
-    return await response.blob(); 
-    // If you want the content as text (e.g., for CSVs)
-    // return await response.text();
-  } else {
-    throw new Error(`Failed to fetch ${endpoint}: ${response.statusText}`);
-  }
+    const response = await fetch(`${BASE_URL}${endpoint}`);
+    if (response.ok) {
+        // Returns file content as a Blob
+        return await response.blob(); 
+    } else {
+        throw new Error(`Failed to fetch ${endpoint}: ${response.statusText}`);
+    }
 }
 
-// Example usage:
-// getHealth().then(data => console.log('Health:', data));
-// getFile('/grid/image').then(blob => {
-//   const imageUrl = URL.createObjectURL(blob);
-//   // Use imageUrl for an <img> tag's src
-// });
+// --- PUT Endpoints ---
 
-const DIRECTIONS_URL = "http://localhost:8765/directions";
-const newDirections = "MOVE FORWARD 10";
+const DIRECTIONS_URL = `${BASE_URL}/directions`;
+const PATH_URL = `${BASE_URL}/grid/path`;
+const OBSTACLES_URL = `${BASE_URL}/grid/obstacles`;
 
 async function sendDirections(directions) {
-  try {
-    const response = await fetch(DIRECTIONS_URL, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'text/plain', // Crucial header for the endpoint
-      },
-      body: directions, // The string itself becomes the body
-    });
+    try {
+        const response = await fetch(DIRECTIONS_URL, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'text/plain', // Crucial header for the endpoint
+            },
+            body: directions, // The string itself becomes the body
+        });
 
-    if (response.ok) {
-      const status = await response.text();
-      console.log('Directions updated successfully:', status); // Should log: updated
-    } else {
-      console.error('Failed to update directions:', response.status, response.statusText);
+        if (response.ok) {
+            const status = await response.text();
+            console.log('Directions updated successfully:', status);
+        } else {
+            console.error('Failed to update directions:', response.status, response.statusText);
+        }
+    } catch (error) {
+        console.error('Network error:', error);
     }
-  } catch (error) {
-    console.error('Network error:', error);
-  }
 }
 
-// Call the function to send the data
-sendDirections(newDirections);
+async function sendGridPath(path_points) { // UPDATED function name
+    try {
+        const response = await fetch(PATH_URL, { // UPDATED URL
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(path_points), // Array of {'r': int, 'c': int}
+        });
 
+        if (response.ok) {
+            const status = await response.json();
+            console.log('Path updated successfully:', status.status);
+        } else {
+            const error = await response.json();
+            console.error('Failed to update path:', error.error);
+        }
+    } catch (error) {
+        console.error('Network error:', error);
+    }
+}
+
+async function sendGridObstacles(obstacles) {
+    try {
+        const response = await fetch(OBSTACLES_URL, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(obstacles), // Array of {'r': int, 'c': int}
+        });
+
+        if (response.ok) {
+            const status = await response.json();
+            console.log('Obstacles updated successfully:', status.status);
+        } else {
+            const error = await response.json();
+            console.error('Failed to update obstacles:', error.error);
+        }
+    } catch (error) {
+        console.error('Network error:', error);
+    }
+}
+
+// --- Example Usage ---
+
+// 1. Send Directions
+sendDirections("MOVE FORWARD 10");
+
+// 2. Send a new Path
+const newPath = [
+    { r: 10, c: 10 },
+    { r: 10, c: 11 },
+    { r: 11, c: 11 }
+];
+sendGridPath(newPath);
+
+// 3. Send a new set of Obstacles
+const newObstacles = [
+    { r: 2, c: 2 },
+    { r: 3, c: 3 }
+];
+sendGridObstacles(newObstacles);
+
+// 4. Fetch the Path JSON after update
+getGridPathJson().then(data => console.log('Current Path Data:', data));
+
+// 5. Fetch Manifest
+getGridManifest().then(data => console.log('Grid Manifest:', data));

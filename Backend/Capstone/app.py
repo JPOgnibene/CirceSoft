@@ -77,17 +77,17 @@ WS_PATH = os.getenv("WS_PATH", "/ws")
 CURRENT_VALUES_PATH = os.getenv("CURRENT_VALUES_PATH", "./data/current_values.txt")
 DIRECTIONS_PATH = os.getenv("DIRECTIONS_PATH", "./data/directions.txt")
 
-# ====== Grid artifacts config ======
+# ====== Grid artifacts config (Updated to use PATH) ======
 GRID_DIR = os.getenv("GRID_DIR", "./")
 GRID_IMAGE_NAME = os.getenv("GRID_IMAGE_NAME", "./data/current_image.jpg")
 GRID_COORDS_NAME = os.getenv("GRID_COORDS_NAME", "./data/grid_coordinates.csv")
 GRID_OBS_NAME = os.getenv("GRID_OBS_NAME", "./data/obstacles.csv")
-GRID_WAYPOINTS_NAME = os.getenv("GRID_WAYPOINTS_NAME", "./data/waypoints.csv") # New waypoint constant
+GRID_PATH_NAME = os.getenv("GRID_PATH_NAME", "./data/path.csv") # Used for path data
 
 GRID_IMAGE_PATH = os.path.join(GRID_DIR, GRID_IMAGE_NAME)
 GRID_COORDS_PATH = os.path.join(GRID_DIR, GRID_COORDS_NAME)
 GRID_OBS_PATH = os.path.join(GRID_DIR, GRID_OBS_NAME)
-GRID_WAYPOINTS_PATH = os.path.join(GRID_DIR, GRID_WAYPOINTS_NAME) # New waypoint path
+GRID_PATH_PATH = os.path.join(GRID_DIR, GRID_PATH_NAME) # Path path
 
 INITIAL_LENGTH = 50.0 # state variable for cable length 
 
@@ -228,18 +228,18 @@ def _write_obstacles_csv(path: str, data: List[Dict[str, int]]) -> None:
             # Map 'r' to 'row' and 'c' to 'col' for writing
             writer.writerow({'row': item['r'], 'col': item['c']})
 
-# --- New Waypoint Helpers ---
+# --- Path Helpers (Renamed from Waypoint Helpers) ---
 
-def _parse_waypoints_csv(path: str) -> List[Dict[str, int]]:
-    """Reads waypoint CSV (row, col) and returns a list of {r: int, c: int} dictionaries."""
-    waypoints = []
+def _parse_path_csv(path: str) -> List[Dict[str, int]]:
+    """Reads path CSV (row, col) and returns a list of {r: int, c: int} dictionaries."""
+    waypoints = [] # Keep internal variable name 'waypoints' for clarity of data type
     if not _exists(path):
         return waypoints
     try:
         with open(path, mode='r', newline='') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                # Assuming waypoints are defined by row and col index
+                # Assuming path points are defined by row and col index
                 waypoints.append({
                     "r": int(row["row"]),
                     "c": int(row["col"]),
@@ -249,9 +249,9 @@ def _parse_waypoints_csv(path: str) -> List[Dict[str, int]]:
         print(f"Error parsing CSV {path}: {e}")
         return []
 
-def _write_waypoints_csv(path: str, data: List[Dict[str, int]]) -> None:
+def _write_path_csv(path: str, data: List[Dict[str, int]]) -> None:
     """
-    Writes a list of waypoint dictionaries ({r: int, c: int}) back to waypoints.csv.
+    Writes a list of path dictionaries ({r: int, c: int}) back to path.csv.
     Assumes incoming data uses 'r' and 'c' keys.
     """
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -272,12 +272,12 @@ async def grid_manifest():
     Frontend can poll this before downloading to detect updates.
     """
     items = []
-    # Note: Added GRID_WAYPOINTS_NAME to the list
+    # Note: Updated to use GRID_PATH_NAME and GRID_PATH_PATH
     for name, path, mime in [
         (GRID_IMAGE_NAME, GRID_IMAGE_PATH, "image/png"),
         (GRID_COORDS_NAME, GRID_COORDS_PATH, "text/csv"),
         (GRID_OBS_NAME, GRID_OBS_PATH, "text/csv"),
-        (GRID_WAYPOINTS_NAME, GRID_WAYPOINTS_PATH, "text/csv"),
+        (GRID_PATH_NAME, GRID_PATH_PATH, "text/csv"),
     ]:
         exists = _exists(path)
         
@@ -288,8 +288,8 @@ async def grid_manifest():
             base_path = "/grid/coordinates"
         elif name == GRID_OBS_NAME:
             base_path = "/grid/obstacles"
-        elif name == GRID_WAYPOINTS_NAME:
-            base_path = "/grid/waypoints"
+        elif name == GRID_PATH_NAME:
+            base_path = "/grid/path" # Updated endpoint name
         else:
             continue
             
@@ -380,7 +380,7 @@ async def put_grid_obstacles(obstacles: List[Dict[str, int]] = Body(..., media_t
     
     # 2. Handle case where all input was invalid, but list was provided
     if not cleaned_data and obstacles:
-         return JSONResponse({"error": "Invalid input format. Expected list of {'r': int, 'c': int}."}, status_code=400)
+        return JSONResponse({"error": "Invalid input format. Expected list of {'r': int, 'c': int}."}, status_code=400)
 
     # 3. Write data to CSV file
     _write_obstacles_csv(GRID_OBS_PATH, cleaned_data)
@@ -391,38 +391,38 @@ async def put_grid_obstacles(obstacles: List[Dict[str, int]] = Body(..., media_t
         headers=_nocache_headers(),
     )
 
-# --- New Waypoint Endpoints ---
+# --- Path Endpoints (Renamed from Waypoint Endpoints) ---
 
-@app.get("/grid/waypoints")
-async def get_grid_waypoints():
-    if not _exists(GRID_WAYPOINTS_PATH):
-        return _not_found(GRID_WAYPOINTS_NAME)
+@app.get("/grid/path")
+async def get_grid_path():
+    if not _exists(GRID_PATH_PATH):
+        return _not_found(GRID_PATH_NAME)
     return FileResponse(
-        GRID_WAYPOINTS_PATH,
+        GRID_PATH_PATH,
         media_type="text/csv",
-        filename=GRID_WAYPOINTS_NAME,
+        filename=GRID_PATH_NAME,
         headers=_nocache_headers(),
     )
 
-@app.get("/grid/waypoints/json")
-async def get_grid_waypoints_json():
-    """Returns waypoint coordinates (r, c) as a JSON array."""
-    data = _parse_waypoints_csv(GRID_WAYPOINTS_PATH)
+@app.get("/grid/path/json")
+async def get_grid_path_json():
+    """Returns path coordinates (r, c) as a JSON array."""
+    data = _parse_path_csv(GRID_PATH_PATH)
     if not data:
-        return _not_found(GRID_WAYPOINTS_NAME)
+        return _not_found(GRID_PATH_NAME)
     return JSONResponse(
         {"data": data},
         headers=_nocache_headers(),
     )
 
-@app.put("/grid/waypoints")
-async def put_grid_waypoints(waypoints: List[Dict[str, int]] = Body(..., media_type="application/json")):
+@app.put("/grid/path")
+async def put_grid_path(path_points: List[Dict[str, int]] = Body(..., media_type="application/json")):
     """
-    Receives a JSON list of {'r': int, 'c': int} objects and overwrites waypoints.csv.
+    Receives a JSON list of {'r': int, 'c': int} objects and overwrites path.csv.
     The frontend should send the COMPLETE path as a list of points.
     """
     cleaned_data = []
-    for wp in waypoints:
+    for wp in path_points:
         if isinstance(wp, dict) and 'r' in wp and 'c' in wp:
             try:
                 # Ensure the data is truly integer-based for row/col
@@ -430,27 +430,27 @@ async def put_grid_waypoints(waypoints: List[Dict[str, int]] = Body(..., media_t
             except (ValueError, TypeError):
                 continue
     
-    if not cleaned_data and waypoints:
+    if not cleaned_data and path_points:
         return JSONResponse({"error": "Invalid input format. Expected list of {'r': int, 'c': int}."}, status_code=400)
 
-    _write_waypoints_csv(GRID_WAYPOINTS_PATH, cleaned_data)
+    _write_path_csv(GRID_PATH_PATH, cleaned_data)
     
     return JSONResponse(
-        {"status": "Waypoints updated successfully", "count": len(cleaned_data)},
+        {"status": "Path updated successfully", "count": len(cleaned_data)},
         headers=_nocache_headers(),
     )
 
 @app.get("/grid/bundle")
 async def get_grid_bundle():
     """
-    Streams a ZIP containing current_image.jpg + grid_coordinates.csv + obstacles.csv + waypoints.csv.
+    Streams a ZIP containing current_image.jpg + grid_coordinates.csv + obstacles.csv + path.csv.
     Missing files are omitted; returns 404 if none exist.
     """
     files = []
     if _exists(GRID_IMAGE_PATH):  files.append((GRID_IMAGE_PATH, GRID_IMAGE_NAME))
     if _exists(GRID_COORDS_PATH): files.append((GRID_COORDS_PATH, GRID_COORDS_NAME))
     if _exists(GRID_OBS_PATH):    files.append((GRID_OBS_PATH, GRID_OBS_NAME))
-    if _exists(GRID_WAYPOINTS_PATH): files.append((GRID_WAYPOINTS_PATH, GRID_WAYPOINTS_NAME)) # Added waypoints
+    if _exists(GRID_PATH_PATH): files.append((GRID_PATH_PATH, GRID_PATH_NAME)) # Added path
 
     if not files:
         return _not_found("grid files")

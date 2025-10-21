@@ -172,20 +172,76 @@ const GridMap = ({
         }}
         onClick={handleSvgClick}
       >
+        {/* Draw grid lines */}
+        {gridData.length > 0 && (() => {
+          const rows = [...new Set(gridData.map(p => p.r))].sort((a, b) => a - b);
+          const cols = [...new Set(gridData.map(p => p.c))].sort((a, b) => a - b);
+          
+          return (
+            <g>
+              {/* Horizontal lines */}
+              {rows.map(r => {
+                const rowPoints = gridData.filter(p => p.r === r).sort((a, b) => a.c - b.c);
+                if (rowPoints.length < 2) return null;
+                const x1 = rowPoints[0].x;
+                const x2 = rowPoints[rowPoints.length - 1].x;
+                const y = rowPoints[0].y;
+                return (
+                  <line
+                    key={`h-${r}`}
+                    x1={x1}
+                    y1={y}
+                    x2={x2}
+                    y2={y}
+                    stroke="red"
+                    strokeWidth="3"
+                    opacity="0.4"
+                    style={{ pointerEvents: "none" }}
+                  />
+                );
+              })}
+              
+              {/* Vertical lines */}
+              {cols.map(c => {
+                const colPoints = gridData.filter(p => p.c === c).sort((a, b) => a.r - b.r);
+                if (colPoints.length < 2) return null;
+                const x = colPoints[0].x;
+                const y1 = colPoints[0].y;
+                const y2 = colPoints[colPoints.length - 1].y;
+                return (
+                  <line
+                    key={`v-${c}`}
+                    x1={x}
+                    y1={y1}
+                    x2={x}
+                    y2={y2}
+                    stroke="red"
+                    strokeWidth="3"
+                    opacity="0.4"
+                    style={{ pointerEvents: "none" }}
+                  />
+                );
+              })}
+            </g>
+          );
+        })()}
+        
+        {/* Draw obstacle circles */}
         {gridData.map((point, index) => {
           const obstacle = isObstacle(point.r, point.c);
+          if (!obstacle) return null;
           return (
             <circle
               key={index}
               cx={point.x}
               cy={point.y}
-              r={obstacle ? 6 : 3}
-              fill={obstacle ? "#00a6ffff" : "red"}
-              stroke={obstacle ? "black" : "none"}
-              strokeWidth={obstacle ? 2 : 0}
-              opacity={obstacle ? 0.95 : 0.6}
+              r={6}
+              fill="#00a6ffff"
+              stroke="black"
+              strokeWidth={2}
+              opacity={0.95}
               style={{
-                pointerEvents: "none", // Don't intercept clicks on circles
+                pointerEvents: "none",
               }}
             />
           );

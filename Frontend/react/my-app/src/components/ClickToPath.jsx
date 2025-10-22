@@ -15,6 +15,10 @@ const ClickToPath = ({
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 800, height: 600 });
   const [gridBounds, setGridBounds] = useState(null);
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragPosition, setDragPosition] = useState(null);
+  const [justFinishedDrag, setJustFinishedDrag] = useState(false);
   
   const transformContext = useTransformContext();
   const scale = transformContext?.state?.scale ?? 1;
@@ -42,7 +46,6 @@ const ClickToPath = ({
       return;
     }
 
-    // Convert from {x, y} format to {r, c} format
     const pathData = path.map(point => ({
       r: point.y,
       c: point.x
@@ -81,8 +84,93 @@ const ClickToPath = ({
     }
   };
 
-  const handleClick = (e) => {
+  // Delete a specific point
+  const deletePoint = (index) => {
+    const deletedPoint = path[index];
+    setPath(path.filter((_, i) => i !== index));
+    if (messageBoxRef?.current) {
+      messageBoxRef.current.addMessage('info', `Waypoint removed at (${deletedPoint.x}, ${deletedPoint.y})`);
+    }
+  };
+
+  // Handle mouse down on path point (start drag)
+  const handlePointMouseDown = (e, index) => {
     if (mode !== "path") return;
+    e.stopPropagation();
+    setDraggedIndex(index);
+    setIsDragging(true);
+  };
+
+  // Handle mouse move (dragging)
+  const handleMouseMove = (e) => {
+    if (!isDragging || draggedIndex === null || mode !== "path" || !gridBounds) return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+    
+    const px = (clickX / rect.width) * imgDimensions.width;
+    const py = (clickY / rect.height) * imgDimensions.height;
+
+    if (
+      px < gridBounds.minPX || 
+      px > gridBounds.maxPX || 
+      (imgDimensions.height-py) < gridBounds.minPY || 
+      (imgDimensions.height-py) > gridBounds.maxPY
+    ){
+      return;
+    }
+    
+    const xCoord = ((px - gridBounds.minPX) / (gridBounds.maxPX - gridBounds.minPX)) * gridBounds.maxCols;
+    const pyFlipped = imgDimensions.height - py;
+    const yCoord = ((pyFlipped - gridBounds.minPY) / (gridBounds.maxPY - gridBounds.minPY)) * gridBounds.maxRows;
+    
+    // Update the path in real-time while dragging
+    const newPath = [...path];
+    newPath[draggedIndex] = {
+      x: Math.round(xCoord),
+      y: Math.round(yCoord)
+    };
+    setPath(newPath);
+  };
+
+  // Handle mouse up (end drag)
+  const handleMouseUp = () => {
+    if (isDragging && draggedIndex !== null) {
+      const movedPoint = path[draggedIndex];
+      if (messageBoxRef?.current) {
+        messageBoxRef.current.addMessage('success', `Waypoint moved to (${movedPoint.x}, ${movedPoint.y})`);
+      }
+    }
+    setIsDragging(false);
+    
+    // Delay clearing draggedIndex to prevent click handler from firing
+    setTimeout(() => {
+      setDraggedIndex(null);
+    }, 0);
+    
+    setDragPosition(null);
+  };
+
+  useEffect(() => {
+    if (isDragging) {
+      const moveHandler = (e) => handleMouseMove(e);
+      const upHandler = () => handleMouseUp();
+      
+      window.addEventListener('mousemove', moveHandler);
+      window.addEventListener('mouseup', upHandler);
+      return () => {
+        window.removeEventListener('mousemove', moveHandler);
+        window.removeEventListener('mouseup', upHandler);
+      };
+    }
+  }, [isDragging, draggedIndex, gridBounds, imgDimensions, dragPosition]);
+
+  const handleClick = (e) => {
+    if (mode !== "path" || isDragging) return;
+    
+    // Don't add a point if we just finished dragging
+    if (draggedIndex !== null) return;
     
     const rect = containerRef.current.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
@@ -260,22 +348,10 @@ const ClickToPath = ({
               pointerEvents: "none",
             }}
           >
-            {completed.length > 1 && (
+            {/* When editing (path mode) or dragging, show the full path in white */}
+            {(mode === "path" || isDragging) && path.length > 1 && (
               <polyline
-                points={completed
-                  .map((dot) => {
-                    const p = graphToPixel(dot);
-                    return `${p.px},${p.py}`;
-                  })
-                  .join(" ")}
-                fill="none"
-                stroke="green"
-                strokeWidth="3"
-              />
-            )}
-            {remaining.length > 1 && (
-              <polyline
-                points={remaining
+                points={path
                   .map((dot) => {
                     const p = graphToPixel(dot);
                     return `${p.px},${p.py}`;
@@ -285,6 +361,38 @@ const ClickToPath = ({
                 stroke="white"
                 strokeWidth="2"
               />
+            )}
+            
+            {/* When not in path mode and not dragging, show progress animation */}
+            {mode !== "path" && !isDragging && (
+              <>
+                {completed.length > 1 && (
+                  <polyline
+                    points={completed
+                      .map((dot) => {
+                        const p = graphToPixel(dot);
+                        return `${p.px},${p.py}`;
+                      })
+                      .join(" ")}
+                    fill="none"
+                    stroke="green"
+                    strokeWidth="3"
+                  />
+                )}
+                {remaining.length > 1 && (
+                  <polyline
+                    points={remaining
+                      .map((dot) => {
+                        const p = graphToPixel(dot);
+                        return `${p.px},${p.py}`;
+                      })
+                      .join(" ")}
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="2"
+                  />
+                )}
+              </>
             )}
           </svg>
           
@@ -296,15 +404,56 @@ const ClickToPath = ({
                 key={index}
                 style={{
                   position: "absolute",
-                  left: px - 5,
-                  top: py - 5,
-                  width: 10,
-                  height: 10,
-                  borderRadius: "50%",
-                  backgroundColor: "white",
-                  pointerEvents: "none",
+                  left: px - 8,
+                  top: py - 8,
+                  pointerEvents: mode === "path" ? "auto" : "none",
                 }}
-              />
+              >
+                {/* Main waypoint circle */}
+                <div
+                  onMouseDown={(e) => handlePointMouseDown(e, index)}
+                  style={{
+                    width: 14,
+                    height: 14,
+                    borderRadius: "50%",
+                    backgroundColor: draggedIndex === index ? "yellow" : "white",
+                    border: "2px solid black",
+                    cursor: mode === "path" ? "move" : "default",
+                    position: "relative",
+                  }}
+                />
+                
+                {/* Delete button (X) */}
+                {mode === "path" && !isDragging && (
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deletePoint(index);
+                    }}
+                    style={{
+                      position: "absolute",
+                      top: -8,
+                      right: -8,
+                      width: 13,
+                      height: 12,
+                      borderRadius: "50%",
+                      backgroundColor: "red",
+                      color: "white",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "10px",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                      border: "1px solid black",
+                      userSelect: "none",
+                    }}
+                    title="Delete waypoint"
+                  >
+                    ×
+                  </div>
+                )}
+              </div>
             );
           })}
           

@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@mui/icons-material": "^7.3.4",
+    "@mui/material": "^7.3.4",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-zoom-pan-pinch": "^3.7.0"

@@ -25,23 +25,38 @@ function EmergencyStop() {
   };
 
   return (
-    <button
-      onClick={emergencyStop}
-      style={{
-        backgroundColor: "red",
-        color: "white",
-        fontWeight: "bold",
-        fontSize: "1.2rem",
-        padding: "0.75rem 1.5rem",
-        border: "none",
-        borderRadius: "50%",
-        cursor: "pointer",
-        boxShadow: "0px 4px 8px rgba(0,0,0,0.2)",
-      }}
-      title="Emergency Stop"
-    >
-      ⏹️
-    </button>
+<button
+  onClick={emergencyStop}
+  style={{
+    background: "#0699fb",         // Blue background
+    border: "none",
+    borderRadius: "50%",
+    width: "44px",                 // Same as your other icons
+    height: "44px",
+    padding: 0,
+    position: "relative",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer"
+  }}
+  title="Emergency Stop"
+>
+  {/* Centered red square */}
+  <span
+    style={{
+      width: "15px",
+      height: "15px",
+      background: "#ea3323",        // Red color for square
+      display: "block",
+      position: "absolute",
+      top: "50%",
+      left: "50%",
+      transform: "translate(-50%, -50%)",
+      borderRadius: "4px"           // Slight rounding for modern look
+    }}
+  />
+</button>
   );
 }
 

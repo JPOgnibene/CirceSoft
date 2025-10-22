@@ -9,7 +9,7 @@ export const WebsocketStatusIcon = ({ messageBoxRef }) => {
   return (
     <img
       id="toggleImage"
-      src="/contents/images/websocket_connection_off.png"
+      src="/contents/images/websocket_connection_off2.png"
       alt="Websocket Status"
       onClick={handleClick}
       style={{ cursor: 'pointer' }}
@@ -24,7 +24,7 @@ export const ImportPathIcon = ({ messageBoxRef }) => {
 
   return (
     <img 
-      src="/contents/images/importpathicon.png" 
+      src="/contents/images/importpathicon2.png" 
       alt="Import path" 
       onClick={handleClick}
       style={{ cursor: 'pointer' }}
@@ -39,7 +39,7 @@ export const PlayButtonIcon = ({ messageBoxRef }) => {
 
   return (
     <img 
-      src="/contents/images/playbutton.png" 
+      src="/contents/images/playbutton2.png" 
       alt="Start/resume path" 
       onClick={handleClick}
       style={{ cursor: 'pointer' }}
@@ -54,7 +54,7 @@ export const PauseButtonIcon = ({ messageBoxRef }) => {
 
   return (
     <img 
-      src="/contents/images/pausebutton.png" 
+      src="/contents/images/pausebutton2.png" 
       alt="Stop path" 
       onClick={handleClick}
       style={{ cursor: 'pointer' }}
@@ -69,7 +69,7 @@ export const WaypointIcon = ({ messageBoxRef }) => {
 
   return (
     <img 
-      src="/contents/images/waypointicon.png" 
+      src="/contents/images/waypointicon2.png" 
       alt="Add a waypoint" 
       onClick={handleClick}
       style={{ cursor: 'pointer' }}
@@ -84,7 +84,7 @@ export const TargetIcon = ({ messageBoxRef }) => {
 
   return (
     <img 
-      src="/contents/images/targeticon.png" 
+      src="/contents/images/targeticon2.png" 
       alt="Select target location" 
       onClick={handleClick}
       style={{ cursor: 'pointer' }}

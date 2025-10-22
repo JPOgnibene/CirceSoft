@@ -10,6 +10,8 @@ const GridMap = ({
 }) => {
   const [gridData, setGridData] = useState([]);
   const [obstacles, setObstacles] = useState([]);
+  const [isDraggingObstacle, setIsDraggingObstacle] = useState(false);
+  const [lastObstaclePoint, setLastObstaclePoint] = useState(null);
   const imgRef = useRef(null);
   const svgRef = useRef(null);
   
@@ -148,6 +150,49 @@ const GridMap = ({
       handlePointClick(closestPoint);
     }
   };
+
+  // Drag to add/remove obstacles
+  // useEffect(() => {
+  //   const handleMouseMove = (e) => {
+  //     if (!isDraggingObstacle) return;
+  //     if (gridData.length === 0) return;
+  //     const svg = svgRef.current;
+  //     if (!svg) return;
+  //     const rect = svg.getBoundingClientRect();
+  //     const moveX = e.clientX - rect.left;
+  //     const moveY = e.clientY - rect.top;
+  //     const svgX = (moveX / rect.width) * imgDimensions.width;
+  //     const svgY = (moveY / rect.height) * imgDimensions.height;
+  //     let closestPoint = null;
+  //     let minDistance = Infinity; 
+  //     gridData.forEach((point) => {
+  //       const dx = point.x - svgX;
+  //       const dy = point.y - svgY;
+  //       const distance = Math.sqrt(dx * dx + dy * dy);
+  //       if (distance < minDistance) {
+  //         minDistance = distance;
+  //         closestPoint = point;
+  //       }
+  //     });
+  //     if (closestPoint) {
+  //       if (!lastObstaclePoint || lastObstaclePoint.r !== closestPoint.r || lastObstaclePoint.c !== closestPoint.c) {
+  //         handlePointClick(closestPoint);
+  //         setLastObstaclePoint(closestPoint);
+  //       }
+  //     }
+  //   };
+
+  //   const handleMouseUp = () => {
+  //     setIsDraggingObstacle(false);
+  //     setLastObstaclePoint(null);
+  //   };
+  //   window.addEventListener("mousemove", handleMouseMove);
+  //   window.addEventListener("mouseup", handleMouseUp);  
+  //   return () => {
+  //     window.removeEventListener("mousemove", handleMouseMove);
+  //     window.removeEventListener("mouseup", handleMouseUp);
+  //   };
+  // }, [isDraggingObstacle, lastObstaclePoint, gridData]);
 
   const handlePointClick = async (point) => {
     if (mode !== "obstacle") return;

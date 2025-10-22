@@ -76,7 +76,7 @@ def octile(a: Coord, b: Coord) -> float:
     return D*(dx+dy) + (D2-2*D)*min(dx, dy)
 
 def astar(width: int, height: int, start: Coord, goal: Coord,
-          blocked: Set[Coord], valid: Set[Coord], diagonal: bool=False) -> Optional[List[Coord]]:
+          blocked: Set[Coord], valid: Set[Coord], max_length:int, diagonal: bool=False) -> Optional[List[Coord]]:
     if start not in valid or goal not in valid: return None
     if start in blocked or goal in blocked: return None
 
@@ -94,14 +94,29 @@ def astar(width: int, height: int, start: Coord, goal: Coord,
     while open_heap:
         _, current = heappop(open_heap)
         if current in closed: continue
-        if current == goal: return reconstruct(came_from, current)
+
+        # Path check limit
+        if g[current] > max_length:
+            continue
+
+        if current == goal: 
+            if g[current] <= max_length:    
+                return reconstruct(came_from, current)
+            else:
+                continue
+        
         closed.add(current)
         cx, cy = current
+
         for nxt in neigh(cx, cy):
             if not in_bounds(nxt, width, height): continue
             if nxt not in valid: continue
             if nxt in blocked: continue
             tentative = g[current] + step_cost(current, nxt)
+
+            if tentative > max_length:
+                continue
+
             if tentative < g.get(nxt, float("inf")):
                 g[nxt] = tentative
                 came_from[nxt] = current
@@ -314,6 +329,7 @@ def main(argv: List[str]) -> int:
     ap.add_argument("--cell-size", type=int, default=16)
     ap.add_argument("--grid-lines", action="store_true")
     ap.add_argument("--no-legend", action="store_true")
+    ap.add_argument("--max-length", default=100, help="Max path length allowed by cable")
     args = ap.parse_args(argv)
 
     # Load CSVs (use first two columns as row,col)
@@ -400,7 +416,11 @@ def main(argv: List[str]) -> int:
             print("[hint] Start is inside the 1-cell safety buffer. Move it at least 1 cell away from obstacles.")
         if goal in buffer_only and goal not in base_blocked:
             print("[hint] Goal is inside the 1-cell safety buffer. Move it at least 1 cell away from obstacles.")
-        print("No path found.")
+        # Reporting for length limit
+        if args.max_length != float('inf'):
+            print(f"No path found (length limit {args.max_length})")
+        else:
+            print("No path found.")
         return 1
 
     length = path_length(path)

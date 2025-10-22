@@ -10,6 +10,8 @@ const GridMap = ({
 }) => {
   const [gridData, setGridData] = useState([]);
   const [obstacles, setObstacles] = useState([]);
+  const [isDraggingObstacle, setIsDraggingObstacle] = useState(false);
+  const [lastObstaclePoint, setLastObstaclePoint] = useState(null);
   const imgRef = useRef(null);
   const svgRef = useRef(null);
   
@@ -62,7 +64,57 @@ const GridMap = ({
 
   const isObstacle = (r, c) => obstacles.some((obs) => obs.r === r && obs.c === c);
 
-  // NEW: Handle clicks on the SVG container
+  // Get the pixel coordinates for a grid point
+  const getGridPointCoords = (r, c) => {
+    const point = gridData.find(p => p.r === r && p.c === c);
+    return point ? { x: point.x, y: point.y } : null;
+  };
+
+  // Generate filled polygons for obstacle visualization
+  const generateObstaclePolygons = () => {
+    if (gridData.length === 0) return [];
+    
+    const polygons = [];
+    const maxR = Math.max(...gridData.map(p => p.r));
+    const maxC = Math.max(...gridData.map(p => p.c));
+
+    // Check each grid cell
+    for (let r = 0; r < maxR; r++) {
+      for (let c = 0; c < maxC; c++) {
+        // Check the 4 corners of this cell
+        const corners = [
+          { r, c, pos: getGridPointCoords(r, c) },
+          { r, c: c + 1, pos: getGridPointCoords(r, c + 1) },
+          { r: r + 1, c: c + 1, pos: getGridPointCoords(r + 1, c + 1) },
+          { r: r + 1, c, pos: getGridPointCoords(r + 1, c) }
+        ];
+
+        // Filter corners that are obstacles and have valid coordinates
+        const obstacleCorners = corners.filter(
+          corner => corner.pos && isObstacle(corner.r, corner.c)
+        );
+
+        if (obstacleCorners.length >= 3) {
+          // Create polygon from obstacle corners
+          const points = obstacleCorners
+            .map(corner => `${corner.pos.x},${corner.pos.y}`)
+            .join(' ');
+          
+          polygons.push({
+            key: `poly-${r}-${c}`,
+            points,
+            cornerCount: obstacleCorners.length
+          });
+        }
+      }
+    }
+
+    return polygons;
+  };
+
+  const obstaclePolygons = generateObstaclePolygons();
+
+  // Handle clicks on the SVG container
   const handleSvgClick = (e) => {
     if (mode !== "obstacle") return;
     if (gridData.length === 0) return;
@@ -98,6 +150,49 @@ const GridMap = ({
       handlePointClick(closestPoint);
     }
   };
+
+  // Drag to add/remove obstacles
+  // useEffect(() => {
+  //   const handleMouseMove = (e) => {
+  //     if (!isDraggingObstacle) return;
+  //     if (gridData.length === 0) return;
+  //     const svg = svgRef.current;
+  //     if (!svg) return;
+  //     const rect = svg.getBoundingClientRect();
+  //     const moveX = e.clientX - rect.left;
+  //     const moveY = e.clientY - rect.top;
+  //     const svgX = (moveX / rect.width) * imgDimensions.width;
+  //     const svgY = (moveY / rect.height) * imgDimensions.height;
+  //     let closestPoint = null;
+  //     let minDistance = Infinity; 
+  //     gridData.forEach((point) => {
+  //       const dx = point.x - svgX;
+  //       const dy = point.y - svgY;
+  //       const distance = Math.sqrt(dx * dx + dy * dy);
+  //       if (distance < minDistance) {
+  //         minDistance = distance;
+  //         closestPoint = point;
+  //       }
+  //     });
+  //     if (closestPoint) {
+  //       if (!lastObstaclePoint || lastObstaclePoint.r !== closestPoint.r || lastObstaclePoint.c !== closestPoint.c) {
+  //         handlePointClick(closestPoint);
+  //         setLastObstaclePoint(closestPoint);
+  //       }
+  //     }
+  //   };
+
+  //   const handleMouseUp = () => {
+  //     setIsDraggingObstacle(false);
+  //     setLastObstaclePoint(null);
+  //   };
+  //   window.addEventListener("mousemove", handleMouseMove);
+  //   window.addEventListener("mouseup", handleMouseUp);  
+  //   return () => {
+  //     window.removeEventListener("mousemove", handleMouseMove);
+  //     window.removeEventListener("mouseup", handleMouseUp);
+  //   };
+  // }, [isDraggingObstacle, lastObstaclePoint, gridData]);
 
   const handlePointClick = async (point) => {
     if (mode !== "obstacle") return;
@@ -225,6 +320,18 @@ const GridMap = ({
             </g>
           );
         })()}
+        
+        {/* Draw filled obstacle regions */}
+        {obstaclePolygons.map(poly => (
+          <polygon
+            key={poly.key}
+            points={poly.points}
+            fill="#00a6ff"
+            opacity="0.7"
+            stroke="none"
+            style={{ pointerEvents: "none" }}
+          />
+        ))}
         
         {/* Draw obstacle circles */}
         {gridData.map((point, index) => {

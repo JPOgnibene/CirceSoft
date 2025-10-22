@@ -11,14 +11,15 @@ const ClickToPath = ({
   image,
   messageBoxRef,
 }) => {
-  const [mode, setMode] = useState("path"); // NEW: current mode
+  const [mode, setMode] = useState("path");
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 800, height: 600 });
   const [gridBounds, setGridBounds] = useState(null);
-
-  // grab zoom state
+  
   const transformContext = useTransformContext();
   const scale = transformContext?.state?.scale ?? 1;
+
+  const PATH_ENDPOINT = "http://localhost:8765/grid/path";
 
   useEffect(() => {
     const el = containerRef.current;
@@ -32,16 +33,61 @@ const ClickToPath = ({
     return () => window.removeEventListener("resize", resize);
   }, []);
 
-  // Only handle clicks when in "path" mode
-  const handleClick = (e) => {
-    if (mode !== "path") return; // prevent path editing in obstacle mode
+  // Export path to server
+  const exportPath = async () => {
+    if (path.length === 0) {
+      if (messageBoxRef?.current) {
+        messageBoxRef.current.addMessage('warning', 'No path to export');
+      }
+      return;
+    }
 
-    //getBoundingClientRec gets container's position/size on screen
+    // Convert from {x, y} format to {r, c} format
+    const pathData = path.map(point => ({
+      r: point.y,
+      c: point.x
+    }));
+
+    try {
+      const response = await fetch(PATH_ENDPOINT, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(pathData),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log("Path exported:", result);
+      
+      if (messageBoxRef?.current) {
+        messageBoxRef.current.addMessage('success', `Path exported: ${path.length} waypoints`);
+      }
+    } catch (error) {
+      console.error("Failed to export path:", error);
+      if (messageBoxRef?.current) {
+        messageBoxRef.current.addMessage('error', 'Failed to export path');
+      }
+    }
+  };
+
+  // Clear current path
+  const clearPath = () => {
+    setPath([]);
+    if (messageBoxRef?.current) {
+      messageBoxRef.current.addMessage('info', 'Path cleared');
+    }
+  };
+
+  const handleClick = (e) => {
+    if (mode !== "path") return;
+    
     const rect = containerRef.current.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
-
-    //get pixel coords
+    
     const px = (clickX / rect.width) * imgDimensions.width;
     const py = (clickY / rect.height) * imgDimensions.height;
 
@@ -59,49 +105,37 @@ const ClickToPath = ({
     }
     
     const xCoord = ((px - gridBounds.minPX) / (gridBounds.maxPX - gridBounds.minPX)) * gridBounds.maxCols;
-    //const xCoord = xMin + (clickX / rect.width) * (xMax - xMin);
-    
     const pyFlipped = imgDimensions.height - py;
     const yCoord = ((pyFlipped - gridBounds.minPY) / (gridBounds.maxPY - gridBounds.minPY)) * gridBounds.maxRows;
-    //const yCoord = yMax - (clickY / rect.height) * (yMax - yMin);
-
-    //Math.round snaps the coords to row/column by rounding
-    console.log("Path set at (", xCoord, ", ", xCoord, ")")
+    
+    console.log("Path set at (", xCoord, ", ", yCoord, ")");
     if (messageBoxRef?.current) {
       messageBoxRef.current.addMessage('success', `Waypoint added at (${Math.round(xCoord)}, ${Math.round(yCoord)})`);
     }
     setPath((p) => [...p, { 
       x: Math.round(xCoord), 
       y: Math.round(yCoord)
-      }]);
+    }]);
   };
 
-  // Map graph coords to pixels
   const graphToPixel = (dot) => {
     const { width, height } = size;
-    //const px = ((dot.x - xMin) / (xMax - xMin)) * width;
-    //const py = ((yMax - dot.y) / (yMax - yMin)) * height;
-
+    
     if (!gridBounds) {
-      // Fallback to center if grid bounds not loaded
       return { px: width / 2, py: height / 2 };
     }
-
-    // Convert grid coordinates back to pixel coordinates on image
+    
     const imgX = gridBounds.minPX + (dot.x / gridBounds.maxCols) * (gridBounds.maxPX - gridBounds.minPX);
     const imgY = gridBounds.minPY + (dot.y / gridBounds.maxRows) * (gridBounds.maxPY - gridBounds.minPY);
     
-    // Convert image pixel coordinates to screen coordinates
     const px = (imgX / imgDimensions.width) * width;
     const py = ((imgDimensions.height - imgY) / imgDimensions.height) * height;
     return { px, py };
   };
 
-  // Handle slider progress for robot motion
   const getPosition = () => {
     if (path.length === 0) return { x: 0, y: 0, index: 0 };
     if (path.length === 1) return { ...path[0], index: 0 };
-
     const totalSegments = path.length - 1;
     const pos = (pathProgress / 100) * totalSegments;
     const index = Math.floor(pos);
@@ -118,7 +152,6 @@ const ClickToPath = ({
   const currentDot = getPosition();
   const { px, py } = graphToPixel(currentDot);
 
-  // Split path
   let completed = [];
   let remaining = [];
   if (path.length > 1) {
@@ -130,16 +163,16 @@ const ClickToPath = ({
   return (
     <>
       {/* === MODE TOGGLE === */}
-      <div style={{ marginBottom: "8px" }}>
+      <div style={{ marginBottom: "8px", display: "flex", gap: "10px", alignItems: "center" }}>
         <button
           onClick={() => setMode("path")}
           style={{
-            marginRight: "10px",
             backgroundColor: mode === "path" ? "#4CAF50" : "#ccc",
             color: "white",
             padding: "6px 12px",
             border: "none",
             borderRadius: "6px",
+            cursor: "pointer",
           }}
         >
           Path Mode
@@ -152,10 +185,42 @@ const ClickToPath = ({
             padding: "6px 12px",
             border: "none",
             borderRadius: "6px",
+            cursor: "pointer",
           }}
         >
           Obstacle Mode
         </button>
+        
+        <div style={{ marginLeft: "20px", display: "flex", gap: "10px" }}>
+          <button
+            onClick={exportPath}
+            disabled={path.length === 0}
+            style={{
+              backgroundColor: path.length > 0 ? "#2196F3" : "#ccc",
+              color: "white",
+              padding: "6px 12px",
+              border: "none",
+              borderRadius: "6px",
+              cursor: path.length > 0 ? "pointer" : "not-allowed",
+            }}
+          >
+            Export Path
+          </button>
+          <button
+            onClick={clearPath}
+            disabled={path.length === 0}
+            style={{
+              backgroundColor: path.length > 0 ? "#FF9800" : "#ccc",
+              color: "white",
+              padding: "6px 12px",
+              border: "none",
+              borderRadius: "6px",
+              cursor: path.length > 0 ? "pointer" : "not-allowed",
+            }}
+          >
+            Clear Path
+          </button>
+        </div>
       </div>
 
       <div
@@ -173,7 +238,6 @@ const ClickToPath = ({
           onClick={handleClick}
           ref={containerRef}
         >
-          {/* Pass mode down to GridMap */}
           <GridMap 
             points={path} 
             mode={mode}
@@ -184,7 +248,7 @@ const ClickToPath = ({
             image={image}
             messageBoxRef={messageBoxRef}
           />
-
+          
           {/* === PATH DRAWING === */}
           <svg
             style={{
@@ -209,7 +273,6 @@ const ClickToPath = ({
                 strokeWidth="3"
               />
             )}
-
             {remaining.length > 1 && (
               <polyline
                 points={remaining
@@ -224,7 +287,7 @@ const ClickToPath = ({
               />
             )}
           </svg>
-
+          
           {/* Draw clicked path dots */}
           {path.map((dot, index) => {
             const { px, py } = graphToPixel(dot);
@@ -244,7 +307,7 @@ const ClickToPath = ({
               />
             );
           })}
-
+          
           {/* Moving icon */}
           <img
             src="/contents/images/circe.png"

@@ -7,10 +7,10 @@ import Slider from "./components/Slider";
 import EmergencyStop from "./components/Stop";
 import SendToCirceBot from "./components/SendToCirceBot"
 import IsMovingStatus from "./components/BotMoving"
+import ImportPathIcon from './components/ImportPathIcon';
 
 import {
   WebsocketStatusIcon,
-  ImportPathIcon,
   PlayButtonIcon,
   PauseButtonIcon,
   WaypointIcon,
@@ -25,6 +25,12 @@ function App() {
   const [completionProgress, setValue] = useState(0);
   const [path, setPath] = useState([]); // store clicked dots (manipulated in ClickToPath.jsx)
 
+  // Handler for imported path
+  const handlePathImported = (importedPath) => {
+    setPath(importedPath);
+  };
+
+
   return (
     <div>
       <header className="header">
@@ -33,7 +39,7 @@ function App() {
             <WebsocketStatusIcon messageBoxRef={messageBoxRef }/>
           </div>
           <div className="clickIcon">
-            <ImportPathIcon messageBoxRef={messageBoxRef} />
+            <ImportPathIcon messageBoxRef={messageBoxRef} onPathImported={handlePathImported}/>
           </div>
           <div className="clickIcon">
             <PlayButtonIcon messageBoxRef={messageBoxRef} />

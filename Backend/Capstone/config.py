@@ -17,7 +17,7 @@ DIRECTIONS_PATH = os.getenv("DIRECTIONS_PATH", "./data/directions.txt")
 
 # --- Grid artifacts config ---
 GRID_DIR = os.getenv("GRID_DIR", "./data")
-GRID_IMAGE_NAME = os.getenv("GRID_IMAGE_NAME", "current_image.jpg")
+GRID_IMAGE_NAME = os.getenv("GRID_IMAGE_NAME", "AerialFootballField.jpg")
 GRID_COORDS_NAME = os.getenv("GRID_COORDS_NAME", "grid_coordinates.csv")
 GRID_OBS_NAME = os.getenv("GRID_OBS_NAME", "obstacles.csv")
 GRID_PATH_NAME = os.getenv("GRID_PATH_NAME", "path.csv")

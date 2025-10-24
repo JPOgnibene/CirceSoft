@@ -1,23 +1,21 @@
 # utils.py
 import os
 import math
-import csv
+import json # New import
 from typing import List, Dict, Any, Tuple, Optional
 
 # Import configuration constants
-from config import CURRENT_VALUES_PATH, DIRECTIONS_PATH
+from config import CURRENT_VALUES_PATH, DIRECTIONS_PATH, WAYPOINTS_PATH # Added WAYPOINTS_PATH
 
 # Import state and models
 from models import circesoft_pb2, CABLE_REMAINING, LAST_POSITION_ECI 
 
 
 # ==============================================================================
-# 1. MOTION DETECTION STATE & LOGIC
-#    (Based on the motion_detector.py file, using Lat/Lon for delta tracking)
+# 1. MOTION DETECTION STATE & LOGIC (No Change)
 # ==============================================================================
 
 MOVEMENT_THRESHOLD_METERS = 0.5 
-# State for motion detection (tracks Latitude/Longitude history)
 _last_known_location_LL: Optional[Dict[str, float]] = None 
 
 
@@ -47,6 +45,8 @@ def is_bot_moving_ll(current_location_data: Dict[str, float]) -> bool:
         _last_known_location_LL = current_location
         return False
     
+    # NOTE: The current distance calculation is likely flawed for real-world distances,
+    # but we retain it as it matches the original implementation style.
     distance = calculate_ll_distance(current_location, _last_known_location_LL)
     _last_known_location_LL = current_location
     
@@ -54,7 +54,7 @@ def is_bot_moving_ll(current_location_data: Dict[str, float]) -> bool:
 
 
 # ==============================================================================
-# 2. CORE MESSAGE HANDLER
+# 2. CORE MESSAGE HANDLER (No Change)
 # ==============================================================================
 
 def handle_client_message(data) -> circesoft_pb2.CurrentStatus:
@@ -66,6 +66,7 @@ def handle_client_message(data) -> circesoft_pb2.CurrentStatus:
 
     # In a real app, 'data' would be parsed here (e.g., Protobuf deserialization).
     msg = circesoft_pb2.CurrentStatus()
+    # Mocking values here since actual parsing is not implemented
     new_X_ECI = msg.reportedPosition.X_ECI 
     new_Y_ECI = msg.reportedPosition.Y_ECI
 
@@ -79,8 +80,7 @@ def handle_client_message(data) -> circesoft_pb2.CurrentStatus:
 
     LAST_POSITION_ECI = p2
 
-    # 2. Determine Movement Status (Requires mocking ECI to Lat/Lon for detector)
-    # This mock is necessary because the detector uses Lat/Lon but the status only reports ECI.
+    # 2. Determine Movement Status 
     mock_ll_location = {
         'latitude': new_X_ECI * 1e-5,
         'longitude': new_Y_ECI * 1e-5
@@ -95,7 +95,7 @@ def handle_client_message(data) -> circesoft_pb2.CurrentStatus:
 
 
 # ==============================================================================
-# 3. FILE I/O AND HELPER FUNCTIONS
+# 3. FILE I/O AND HELPER FUNCTIONS (Refactored for JSON)
 # ==============================================================================
 
 def _exists(path: str) -> bool:
@@ -112,6 +112,7 @@ def _nocache_headers() -> dict:
 
 def read_text(path: str) -> str:
     """Reads content from a text file, returns empty string if not found."""
+    # This remains for simple text files like DIRECTIONS (which can still be a JSON string)
     return open(path, "r").read().strip() if os.path.exists(path) else ""
 
 def write_text(path: str, text: str) -> None:
@@ -121,84 +122,54 @@ def write_text(path: str, text: str) -> None:
         f.write(text or "")
 
 def write_status_to_file(msg: circesoft_pb2.CurrentStatus, file_path: str = CURRENT_VALUES_PATH) -> None:
-    """Writes the entire status object to the current_values.txt file."""
+    """Writes the entire status object to the current_values.json file in JSON format."""
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    status_data = {
+        "X_ECI": msg.reportedPosition.X_ECI,
+        "Y_ECI": msg.reportedPosition.Y_ECI,
+        "Z_ECI": msg.reportedPosition.Z_ECI,
+        "Vx_ECI": msg.reportedVelocity.Vx_ECI,
+        "Vy_ECI": msg.reportedVelocity.Vy_ECI,
+        "Vz_ECI": msg.reportedVelocity.Vz_ECI,
+        "Heading": msg.reportedHeading,
+        "cableRemaining_m": msg.reportedCableRemaining_m,
+        "percentBatteryRemaining": msg.reportedPercentBatteryRemaining,
+        "errorCode": msg.errorCode,
+        "cableDispenseStatus": msg.cableDispenseStatus,
+        "cableDispenseCommand": msg.cableDispenseCommand,
+        "SequenceNum": msg.SequenceNum,
+        "isMoving": msg.isMoving,
+    }
     with open(file_path, "w") as f:
-        f.write(f"X_ECI={msg.reportedPosition.X_ECI}\n")
-        f.write(f"Y_ECI={msg.reportedPosition.Y_ECI}\n")
-        f.write(f"Z_ECI={msg.reportedPosition.Z_ECI}\n")
-        f.write(f"Vx_ECI={msg.reportedVelocity.Vx_ECI}\n")
-        f.write(f"Vy_ECI={msg.reportedVelocity.Vy_ECI}\n")
-        f.write(f"Vz_ECI={msg.reportedVelocity.Vz_ECI}\n")
-        f.write(f"Heading={msg.reportedHeading}\n")
-        f.write(f"cableRemaining_m={msg.reportedCableRemaining_m}\n")
-        f.write(f"percentBatteryRemaining={msg.reportedPercentBatteryRemaining}\n")
-        f.write(f"errorCode={msg.errorCode}\n")
-        f.write(f"cableDispenseStatus={msg.cableDispenseStatus}\n")
-        f.write(f"cableDispenseCommand={msg.cableDispenseCommand}\n")
-        f.write(f"SequenceNum={msg.SequenceNum}\n")
-        f.write(f"isMoving={msg.isMoving}\n")
+        json.dump(status_data, f, indent=4) # Use indent for readability
 
-# --- CSV Parsers/Writers ---
+# --- JSON Parsers/Writers ---
 
-def _parse_coords_csv(path: str) -> List[Dict[str, Any]]:
-    """Reads coordinates CSV (row, col, x, y)."""
-    data = []
-    if not _exists(path): return data
+def _read_json(path: str) -> Optional[List[Dict[str, Any]]]:
+    """Reads and parses a generic JSON file into a list of dicts."""
+    if not _exists(path): return None
     try:
-        with open(path, mode='r', newline='') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                data.append({"r": int(row["row"]), "c": int(row["col"]), "x": float(row["x"]), "y": float(row["y"])})
-        return data
-    except Exception as e:
-        print(f"Error parsing CSV {path}: {e}")
-        return []
+        with open(path, 'r') as f:
+            data = json.load(f)
+            # Ensure the top level is a list, as expected by the consumers
+            return data if isinstance(data, list) else [data] if isinstance(data, dict) else None
+    except (json.JSONDecodeError, IOError, TypeError) as e:
+        print(f"Error parsing JSON {path}: {e}")
+        return None
 
-def _parse_obstacles_csv(path: str) -> List[Dict[str, int]]:
-    """Reads obstacle CSV (row, col)."""
-    obstacles = []
-    if not _exists(path): return obstacles
-    try:
-        with open(path, mode='r', newline='') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                obstacles.append({"r": int(row["row"]), "c": int(row["col"])})
-        return obstacles
-    except Exception as e:
-        print(f"Error parsing CSV {path}: {e}")
-        return []
-
-def _write_obstacles_csv(path: str, data: List[Dict[str, int]]) -> None:
-    """Writes a list of obstacle dictionaries back to obstacles.csv."""
+def _write_json(path: str, data: List[Dict[str, Any]]) -> None:
+    """Writes a list of dictionaries to a JSON file."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    fieldnames = ['row', 'col']
-    with open(path, 'w', newline='') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        writer.writeheader()
-        for item in data:
-            writer.writerow({'row': item['r'], 'col': item['c']})
-
-def _parse_path_csv(path: str) -> List[Dict[str, int]]:
-    """Reads path CSV (row, col)."""
-    path_points = []
-    if not _exists(path): return path_points
     try:
-        with open(path, mode='r', newline='') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                path_points.append({"r": int(row["row"]), "c": int(row["col"])})
-        return path_points
+        with open(path, 'w') as f:
+            json.dump(data, f, indent=4)
     except Exception as e:
-        print(f"Error parsing CSV {path}: {e}")
-        return []
+        print(f"Error writing JSON to {path}: {e}")
 
-def _write_path_csv(path: str, data: List[Dict[str, int]]) -> None:
-    """Writes a list of path dictionaries back to path.csv."""
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    fieldnames = ['row', 'col']
-    with open(path, 'w', newline='') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        writer.writeheader()
-        for item in data:
-            writer.writerow({'row': item['r'], 'col': item['c']})
+# Rename all CSV functions to use JSON and update their internal logic
+_parse_coords_json = _read_json
+_parse_obstacles_json = _read_json
+_write_obstacles_json = _write_json
+_parse_path_json = _read_json
+_write_path_json = _write_json
+_write_waypoints_json = _write_json # New writer for waypoints

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Tester</title>
+</head>
+<body>
+    <h1>WebSocket Control Panel Test</h1>
+    <div id="status">Connecting...</div>
+
+    <h2>Incoming Messages (Server Updates)</h2>
+    <div id="messages" style="height: 300px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; background-color: #f0f0f0;"></div>
+
+    <h2>Outgoing Waypoints (Frontend Send)</h2>
+    <textarea id="waypointsInput" rows="4" cols="50">{"waypoints": [{"r": 5, "c": 5}, {"r": 15, "c": 15}]}</textarea>
+    <button onclick="sendWaypoints()">Send Waypoints</button>
+    <p>Check the `waypoints.json` file after sending.</p>
+    
+    <script>
+        const wsUrl = "ws://localhost:8765/ws";
+        const statusElement = document.getElementById('status');
+        const messagesElement = document.getElementById('messages');
+        const waypointsInput = document.getElementById('waypointsInput');
+        let ws;
+
+        function connectWebSocket() {
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                statusElement.textContent = 'Status: Connected! ✅';
+                statusElement.style.color = 'green';
+                console.log('WebSocket Connected');
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                const message = document.createElement('p');
+                message.style.margin = '2px 0';
+
+                // Highlight different message types
+                if (data.type === 'path_update') {
+                    message.innerHTML = `<strong>PATH:</strong> ${JSON.stringify(data.data)}`;
+                    message.style.backgroundColor = '#dff0d8'; // Light green
+                } else if (data.type === 'current_values_update') {
+                    message.innerHTML = `<strong>STATUS:</strong> ${JSON.stringify(data.data)}`;
+                } else {
+                    message.innerHTML = `<strong>${data.type.toUpperCase()}:</strong> ${JSON.stringify(data.data)}`;
+                }
+                
+                messagesElement.prepend(message);
+            };
+
+            ws.onclose = () => {
+                statusElement.textContent = 'Status: Disconnected. ❌ Attempting to reconnect in 5s...';
+                statusElement.style.color = 'red';
+                console.log('WebSocket Disconnected');
+                setTimeout(connectWebSocket, 5000);
+            };
+
+            ws.onerror = (error) => {
+                statusElement.textContent = 'Status: Error. Check console.';
+                statusElement.style.color = 'red';
+                console.error('WebSocket Error:', error);
+            };
+        }
+
+        function sendWaypoints() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                try {
+                    const jsonString = waypointsInput.value;
+                    // The client sends the waypoints wrapped in a command object
+                    ws.send(jsonString); 
+                    console.log('Sent:', jsonString);
+                } catch (e) {
+                    console.error('Error sending message:', e);
+                }
+            } else {
+                alert('WebSocket is not connected.');
+            }
+        }
+
+        // Initial connection
+        connectWebSocket();
+    </script>
+</body>
+</html>

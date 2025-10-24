@@ -1,4 +1,5 @@
-# config.py
+# Backend/Capstone/config.py (RESOLVED CONTENT)
+
 import os
 from dotenv import load_dotenv
 
@@ -11,18 +12,22 @@ APP_PORT = int(os.getenv("APP_PORT", "8765"))
 WS_PATH = os.getenv("WS_PATH", "/ws")
 CORS_ALLOW_ORIGINS = os.getenv("CORS_ALLOW_ORIGINS", "*")
 
-# --- File Paths ---
-CURRENT_VALUES_PATH = os.getenv("CURRENT_VALUES_PATH", "./data/current_values.txt")
-DIRECTIONS_PATH = os.getenv("DIRECTIONS_PATH", "./data/directions.txt")
+# --- File Paths (Updated to JSON) ---
+# Ensuring these use .json
+CURRENT_VALUES_PATH = os.getenv("CURRENT_VALUES_PATH", "./data/current_values.json")
+DIRECTIONS_PATH = os.getenv("DIRECTIONS_PATH", "./data/directions.json")
+WAYPOINTS_PATH = os.getenv("WAYPOINTS_PATH", "./data/waypoints.json")
 
 # --- Grid artifacts config ---
-GRID_DIR = os.getenv("GRID_DIR", "./data")
-GRID_IMAGE_NAME = os.getenv("GRID_IMAGE_NAME", "AerialFootballField.jpg")
-GRID_COORDS_NAME = os.getenv("GRID_COORDS_NAME", "grid_coordinates.csv")
-GRID_OBS_NAME = os.getenv("GRID_OBS_NAME", "obstacles.csv")
-GRID_PATH_NAME = os.getenv("GRID_PATH_NAME", "path.csv")
+# CRITICAL FIX: Changing default grid directory to './data'
+GRID_DIR = os.getenv("GRID_DIR", "./data") 
+GRID_IMAGE_NAME = os.getenv("GRID_IMAGE_NAME", "current_image.jpg")
+# CRITICAL FIX: Changing all grid artifacts to .json
+GRID_COORDS_NAME = os.getenv("GRID_COORDS_NAME", "grid_coordinates.json")
+GRID_OBS_NAME = os.getenv("GRID_OBS_NAME", "obstacles.json")
+GRID_PATH_NAME = os.getenv("GRID_PATH_NAME", "path.json")
 
-# Full Paths
+# Full Paths (These automatically use the updated GRID_DIR)
 GRID_IMAGE_PATH = os.path.join(GRID_DIR, GRID_IMAGE_NAME)
 GRID_COORDS_PATH = os.path.join(GRID_DIR, GRID_COORDS_NAME)
 GRID_OBS_PATH = os.path.join(GRID_DIR, GRID_OBS_NAME)

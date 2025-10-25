@@ -166,6 +166,43 @@ def _write_json(path: str, data: List[Dict[str, Any]]) -> None:
     except Exception as e:
         print(f"Error writing JSON to {path}: {e}")
 
+
+#=======================================================================
+#               PATH PROGRESS FUNCTIONS
+#=======================================================================
+def load_path_json(path_json: str) -> list:
+    """Load a path as a list of (col, row) tuples from a JSON file."""
+    data = _read_json(path_json)
+    return [(int(item["col"]), int(item["row"])) for item in data] if data else []
+
+
+def path_length(path: list) -> float:
+    """Total path length in grid cells/meters."""
+    if not path or len(path) < 2:
+        return 0.0
+    dist = 0.0
+    for a, b in zip(path, path[1:]):
+        diag = (a[0] != b[0] and a[1] != b[1])
+        dist += math.sqrt(2.0) if diag else 1.0
+    return dist
+
+def closest_path_index(path: list, pos: tuple) -> int:
+    """Index of path node closest to 'pos' (in grid coordinates)."""
+    return min(range(len(path)), key=lambda i: math.hypot(path[i][0] - pos[0], path[i][1] - pos[1]))
+
+def distance_along_path(path: list, idx: int, pos: tuple = None) -> float:
+    """Distance along path to index (plus offset if pos given)."""
+    dist = 0.0
+    for a, b in zip(path, path[1:idx+1]):
+        diag = (a[0] != b[0] and a[1] != b[1])
+        dist += math.sqrt(2.0) if diag else 1.0
+    if pos and idx < len(path):
+        last = path[idx]
+        dist += math.hypot(pos[0] - last[0], pos[1] - last[1])
+    return dist
+
+
+
 # Rename all CSV functions to use JSON and update their internal logic
 _parse_coords_json = _read_json
 _parse_obstacles_json = _read_json

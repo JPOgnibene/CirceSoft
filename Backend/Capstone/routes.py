@@ -20,10 +20,14 @@ from utils import (
     read_text, write_text, write_status_to_file, handle_client_message,
     _exists, _nocache_headers,
     _parse_coords_json, _parse_obstacles_json, _write_obstacles_json, # Updated names
-    _parse_path_json, _write_path_json, _write_waypoints_json # Updated names
-)
+    _parse_path_json, _write_path_json, _write_waypoints_json, # Updated names
+    load_path_json, path_length, closest_path_index, distance_along_path
+    )
 
 router = APIRouter()
+
+## Must do: set filepath for generated path
+PATH_FILE = ""
 
 # --- Helper for Errors ---
 def _not_found(name: str) -> JSONResponse:
@@ -208,6 +212,20 @@ async def put_grid_path(path_points: List[Dict[str, int]] = Body(..., media_type
         {"status": "Path updated successfully", "count": len(cleaned_data)},
         headers=_nocache_headers(),
     )
+
+# Path Progress
+@router.get("/progress")
+async def get_path_progress(current_x: float, current_y: float):
+    path = load_path_json(PATH_FILE)
+    idx = closest_path_index(path, grid_pos)
+    traveled = distance_along_path(path, idx, grid_pos)
+    total = path_length(path)
+    percent = (traveled / total) * 100 if total > 0 else 0.0
+    return {
+        "percent_completed": percent,
+        "distance_traveled": traveled,
+        "total_path_length": total
+    }
 
 @router.get("/grid/bundle")
 async def get_grid_bundle():

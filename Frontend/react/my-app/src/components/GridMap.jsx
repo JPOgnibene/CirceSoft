@@ -15,10 +15,10 @@ const GridMap = ({
   const imgRef = useRef(null);
   const svgRef = useRef(null);
   
-  const GRID_ENDPOINT = "http://localhost:8765/grid/coordinates/json";
+  const GRID_ENDPOINT = "http://localhost:8765/grid/coordinates";
   const IMAGE_ENDPOINT = "http://localhost:8765/grid/image";
   const OBSTACLE_ENDPOINT = "http://localhost:8765/grid/obstacles";
-  const OBSTACLE_JSON_ENDPOINT = "http://localhost:8765/grid/obstacles/json";
+  const OBSTACLE_JSON_ENDPOINT = "http://localhost:8765/grid/obstacles";
 
   useEffect(() => {
     if (gridData.length > 0) {
@@ -40,7 +40,15 @@ const GridMap = ({
         const response = await fetch(GRID_ENDPOINT);
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
         const json = await response.json();
-        setGridData(json.data || []);
+        const mappedData = (json.data || json || []).map(point => ({
+          row: point.row,
+          col: point.col,
+          x: point.x,
+          y: point.y,
+          r: point.row,
+          c: point.col
+        }));
+        setGridData(mappedData || []);
       } catch (error) {
         console.error("Failed to fetch grid data:", error);
       }
@@ -54,7 +62,9 @@ const GridMap = ({
         const response = await fetch(OBSTACLE_JSON_ENDPOINT);
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
         const json = await response.json();
-        setObstacles(json.data || []);
+        // Handle both {data: [...]} or direct array format
+        const obstaclesData = json.data || json || [];
+        setObstacles(obstaclesData);
       } catch (error) {
         console.error("Failed to fetch obstacle data:", error);
       }

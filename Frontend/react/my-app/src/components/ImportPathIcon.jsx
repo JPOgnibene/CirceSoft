@@ -1,7 +1,7 @@
 import React from 'react';
 
 const ImportPathIcon = ({ messageBoxRef, onPathImported }) => {
-  const PATH_JSON_ENDPOINT = "http://localhost:8765/grid/path/json";
+  const PATH_JSON_ENDPOINT = "http://localhost:8765/grid/path";
 
   const handleImportPath = async () => {
     try {
@@ -11,7 +11,8 @@ const ImportPathIcon = ({ messageBoxRef, onPathImported }) => {
       }
       
       const json = await response.json();
-      const pathData = json.data || [];
+      // Handle both formats: {data: [...]} or direct array
+      const pathData = json.data || json || [];
       
       if (pathData.length === 0) {
         if (messageBoxRef?.current) {

@@ -27,7 +27,6 @@ class GridClientWS {
     this.onConnectionChange = onConnectionChange;
     this.reconnectTimeout = null;
     this.manualDisconnect = false;
-    this.wasConnected = false; // Track if we were previously connected
   }
 
   connect() {
@@ -41,7 +40,6 @@ class GridClientWS {
 
     this.socket.onopen = () => {
       console.log('WebSocket Connected.');
-      this.wasConnected = true;
       this.onConnectionChange?.(true);
     };
 

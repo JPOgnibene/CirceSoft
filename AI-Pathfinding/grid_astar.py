@@ -3,19 +3,26 @@
 grid_astar.py
 A* shortest path on a grid defined by two CSVs (grid + obstacles).
 
-This version includes:
+Includes:
 - Hardcoded CSV paths
 - PNG rendering
 - ASCII rendering with safety toggles
 - Writes unreachable cells (w.r.t. start and movement model) back to obstacles.csv
 - Exports the computed path to a hardcoded path.csv
-- NEW: Keeps one-cell clearance from obstacles by inflating obstacles by 1 cell (8-neighborhood)
+- Keeps one-cell clearance from obstacles by inflating obstacles by 1 cell (8-neighborhood)
+- Enforces cable-length limit using anisotropic step costs (ft): X, Y, Diagonal
+- Posts messages to a local frontend AND prints to console
 """
 
 import argparse, math, sys, os
 from typing import Dict, List, Optional, Set, Tuple
 import pandas as pd
-import requests
+
+# --- Cable and step distances (feet) ---
+CABLE_MAX_FT = 300.0
+COST_X = 7.5
+COST_Y = 5.16129
+COST_DIAG = 9.104334  # for (±1,±1) steps
 
 # -------------------------
 # Hardcoded file paths
@@ -34,7 +41,27 @@ try:
 except Exception:
     _MATPLOTLIB_AVAILABLE = False
 
+# Optional requests (for frontend posting)
+try:
+    import requests
+    _REQUESTS_AVAILABLE = True
+except Exception:
+    _REQUESTS_AVAILABLE = False
+
 Coord = Tuple[int, int]  # (x, y) == (col, row)
+
+# ------------------------- Utilities -------------------------
+
+_FRONTEND_URL = "http://localhost:8000/send-astar-message"
+
+def log(msg: str) -> None:
+    """Print and (best-effort) POST to the frontend."""
+    print(msg)
+    if _REQUESTS_AVAILABLE:
+        try:
+            requests.post(_FRONTEND_URL, json={"message": str(msg)}, timeout=1.0)
+        except Exception:
+            pass
 
 # ------------------------- Parsing -------------------------
 
@@ -55,18 +82,6 @@ def parse_rc(token: str) -> Coord:
     row, col = int(parts[0]), int(parts[1])
     return (col, row)
 
-def send_message_to_frontend(message: str):
-    url = "http://localhost:8000/send-astar-message"
-    try:
-        response = requests.post(url, json={"message": message})
-        if response.status_code == 200:
-            send_message_to_frontend("Message sent to frontend successfully")
-        else:
-            send_message_to_frontend(f"Failed to send message: {response.status_code} {response.text}")
-    except Exception as e:
-        send_message_to_frontend(f"Exception sending message to frontend: {e}")
-
-
 # ------------------------- A* helpers -------------------------
 
 def in_bounds(p: Coord, width: int, height: int) -> bool:
@@ -80,23 +95,49 @@ def neighbors_8(x: int, y: int):
     return [(x-1,y), (x+1,y), (x,y-1), (x,y+1),
             (x-1,y-1), (x-1,y+1), (x+1,y-1), (x+1,y+1)]
 
-def manhattan(a: Coord, b: Coord) -> float:
-    return abs(a[0]-b[0]) + abs(a[1]-b[1])
+# Admissible heuristics for anisotropic costs
+def weighted_manhattan(a: Coord, b: Coord) -> float:
+    dx = abs(a[0] - b[0])
+    dy = abs(a[1] - b[1])
+    return COST_X * dx + COST_Y * dy
 
-def octile(a: Coord, b: Coord) -> float:
-    dx, dy = abs(a[0]-b[0]), abs(a[1]-b[1])
-    D, D2 = 1.0, math.sqrt(2.0)
-    return D*(dx+dy) + (D2-2*D)*min(dx, dy)
+def weighted_octile(a: Coord, b: Coord) -> float:
+    dx = abs(a[0] - b[0])
+    dy = abs(a[1] - b[1])
+    dmin = min(dx, dy)
+    dmax = max(dx, dy)
+    # Use diagonals for min(dx,dy) then finish along dominant axis
+    return COST_DIAG * dmin + (dmax - dmin) * (COST_X if dx > dy else COST_Y)
+
+def step_cost(a: Coord, b: Coord) -> float:
+    """Feet between adjacent grid cells under 4/8-way movement."""
+    ax, ay = a; bx, by = b
+    if ax != bx and ay != by:
+        return COST_DIAG
+    elif ax != bx:
+        return COST_X
+    else:
+        return COST_Y
+
+def path_length_feet(path: Optional[List[Coord]]) -> float:
+    if not path or len(path) < 2:
+        return 0.0 if path else float("inf")
+    total = 0.0
+    for u, v in zip(path, path[1:]):
+        total += step_cost(u, v)
+    return total
 
 def astar(width: int, height: int, start: Coord, goal: Coord,
-          blocked: Set[Coord], valid: Set[Coord], max_length:int, diagonal: bool=False) -> Optional[List[Coord]]:
-    if start not in valid or goal not in valid: return None
-    if start in blocked or goal in blocked: return None
+          blocked: Set[Coord], valid: Set[Coord],
+          *, diagonal: bool=False, cable_limit_ft: float = CABLE_MAX_FT) -> Optional[List[Coord]]:
+    if start not in valid or goal not in valid:
+        return None
+    if start in blocked or goal in blocked:
+        return None
 
     from heapq import heappush, heappop
     neigh = neighbors_8 if diagonal else neighbors_4
-    h = octile if diagonal else manhattan
-    step_cost = (lambda a,b: math.sqrt(2.0) if (a[0]!=b[0] and a[1]!=b[1]) else 1.0) if diagonal else (lambda a,b: 1.0)
+    h = weighted_octile if diagonal else weighted_manhattan
 
     open_heap: List[Tuple[float, Coord]] = []
     heappush(open_heap, (h(start, goal), start))
@@ -106,28 +147,28 @@ def astar(width: int, height: int, start: Coord, goal: Coord,
 
     while open_heap:
         _, current = heappop(open_heap)
-        if current in closed: continue
-
-        # Path check limit
-        if g[current] > max_length:
+        if current in closed:
             continue
 
-        if current == goal: 
-            if g[current] <= max_length:    
+        if g[current] > cable_limit_ft:
+            continue
+
+        if current == goal:
+            if g[current] <= cable_limit_ft:
                 return reconstruct(came_from, current)
-            else:
-                continue
-        
         closed.add(current)
+
         cx, cy = current
-
         for nxt in neigh(cx, cy):
-            if not in_bounds(nxt, width, height): continue
-            if nxt not in valid: continue
-            if nxt in blocked: continue
-            tentative = g[current] + step_cost(current, nxt)
+            if not in_bounds(nxt, width, height): 
+                continue
+            if nxt not in valid: 
+                continue
+            if nxt in blocked: 
+                continue
 
-            if tentative > max_length:
+            tentative = g[current] + step_cost(current, nxt)
+            if tentative > cable_limit_ft:
                 continue
 
             if tentative < g.get(nxt, float("inf")):
@@ -144,14 +185,6 @@ def reconstruct(came_from: Dict[Coord, Coord], current: Coord) -> List[Coord]:
         path.append(current)
     path.reverse()
     return path
-
-def path_length(path: Optional[List[Coord]]) -> float:
-    if not path or len(path) < 2: return 0.0 if path else float("inf")
-    total = 0.0
-    for a, b in zip(path, path[1:]):
-        diag = (a[0]!=b[0] and a[1]!=b[1])
-        total += math.sqrt(2.0) if diag else 1.0
-    return total
 
 # ------------------------- Rendering -------------------------
 
@@ -215,7 +248,6 @@ def render_png(outfile: str,
         if 0 <= x < width and 0 <= y < height and img[y, x] != 2:
             img[y, x] = 3
 
-    from matplotlib.colors import ListedColormap
     cmap = ListedColormap(["#d9d9d9", "#ffffff", "#000000", "#7f7f7f"])  # bg, free, obstacle, buffer
 
     px_w, px_h = max(1, width*cell_size), max(1, height*cell_size)
@@ -238,7 +270,6 @@ def render_png(outfile: str,
         for y in range(height+1): ax.axhline(y-0.5, linewidth=0.5)
 
     if show_legend:
-        import matplotlib.patches as mpatches
         bg   = mpatches.Patch(color="#d9d9d9", label="Outside Mask")
         free = mpatches.Patch(color="#ffffff", label="Free")
         obs  = mpatches.Patch(color="#000000", label="Obstacle")
@@ -251,8 +282,7 @@ def render_png(outfile: str,
     ax.set_aspect('equal'); ax.set_xticks([]); ax.set_yticks([])
     fig.tight_layout(pad=0); fig.savefig(outfile, bbox_inches="tight"); plt.close(fig)
 
-
-# ------------------------- New: reachability / inflation / I/O helpers -------------------------
+# ------------------------- Reachability / inflation / I/O -------------------------
 
 def _compute_reachable(width: int, height: int, start: Coord,
                        blocked: Set[Coord], valid: Set[Coord],
@@ -267,11 +297,11 @@ def _compute_reachable(width: int, height: int, start: Coord,
         cx, cy = stack.pop()
         for nx, ny in neigh(cx, cy):
             p = (nx, ny)
-            if not in_bounds(p, width, height): 
+            if not in_bounds(p, width, height):
                 continue
-            if p in seen: 
+            if p in seen:
                 continue
-            if p not in valid or p in blocked: 
+            if p not in valid or p in blocked:
                 continue
             seen.add(p)
             stack.append(p)
@@ -279,15 +309,13 @@ def _compute_reachable(width: int, height: int, start: Coord,
 
 def inflate_obstacles(blocked: Set[Coord], valid: Set[Coord], width: int, height: int, radius: int = 1) -> Set[Coord]:
     """
-    Inflate obstacles by Chebyshev radius (default 1). This ensures the path keeps at least
-    one cell away in all directions. Only inflates into valid cells and within bounds.
+    Inflate obstacles by Chebyshev radius (default 1). Ensures the path keeps at least
+    one cell away in all directions. Inflates only into valid cells and in-bounds.
     """
     if radius <= 0:
         return set(blocked)
     inflated = set(blocked)
-    # All displacements with Chebyshev distance <= radius
-    deltas = [(dx, dy) for dx in range(-radius, radius+1)
-                       for dy in range(-radius, radius+1)]
+    deltas = [(dx, dy) for dx in range(-radius, radius+1) for dy in range(-radius, radius+1)]
     for (ox, oy) in list(blocked):
         for dx, dy in deltas:
             nx, ny = ox + dx, oy + dy
@@ -298,8 +326,8 @@ def inflate_obstacles(blocked: Set[Coord], valid: Set[Coord], width: int, height
 
 def _update_obstacles_csv(obstacles_df: pd.DataFrame, new_obstacles: Set[Coord]) -> None:
     """
-    Merge new (x,y) obstacles into obstacles_df (using only first two columns as row,col) and write back
-    to OBSTACLES_CSV_PATH. Duplicates are removed.
+    Merge new (x,y) obstacles into obstacles_df (only first two columns row,col) and write back to OBSTACLES_CSV_PATH.
+    Duplicates are removed.
     """
     core = obstacles_df.iloc[:, :2].rename(columns={obstacles_df.columns[0]: "row",
                                                     obstacles_df.columns[1]: "col"})
@@ -321,9 +349,9 @@ def write_path_csv(path: List[Coord]) -> None:
             w.writerow(["col", "row"])
             for x, y in path:
                 w.writerow([x, y])
-        send_message_to_frontend(f"[info] Path saved to {OUTPUT_PATH_CSV} ({len(path)} points)")
+        log(f"[info] Path saved to {OUTPUT_PATH_CSV} ({len(path)} points)")
     except Exception as e:
-        send_message_to_frontend(f"[warn] Could not write path CSV: {e}")
+        log(f"[warn] Could not write path CSV: {e}")
 
 # ------------------------- CLI -------------------------
 
@@ -342,8 +370,12 @@ def main(argv: List[str]) -> int:
     ap.add_argument("--cell-size", type=int, default=16)
     ap.add_argument("--grid-lines", action="store_true")
     ap.add_argument("--no-legend", action="store_true")
-    ap.add_argument("--max-length", default=100, help="Max path length allowed by cable")
+    # legacy flag preserved; maps to cable-ft if used
+    ap.add_argument("--max-length", type=float, default=None, help="(Legacy) Max path length; superseded by --cable-ft.")
+    ap.add_argument("--cable-ft", type=float, default=CABLE_MAX_FT, help="Cable length budget in feet (default 300).")
     args = ap.parse_args(argv)
+
+    cable_limit = args.cable_ft if args.max_length is None else float(args.max_length)
 
     # Load CSVs (use first two columns as row,col)
     grid_df = pd.read_csv(GRID_CSV_PATH)
@@ -357,10 +389,10 @@ def main(argv: List[str]) -> int:
     base_blocked: Set[Coord] = set(pt for pt in blocked_raw if pt in valid)  # persisted obstacles only
 
     if not valid:
-        send_message_to_frontend("Grid CSV produced an empty set of valid cells.", file=sys.stderr)
+        log("Grid CSV produced an empty set of valid cells.")
         return 2
 
-    # Bounds from valid set (image space is 0..max)
+    # Bounds from valid set
     min_x, min_y = min(x for x, _ in valid), min(y for _, y in valid)
     max_x, max_y = max(x for x, _ in valid), max(y for _, y in valid)
     width, height = max_x + 1, max_y + 1
@@ -386,18 +418,19 @@ def main(argv: List[str]) -> int:
     if newly_unreachable:
         base_blocked |= newly_unreachable
         _update_obstacles_csv(obs_df, newly_unreachable)
-        send_message_to_frontend(f"[info] Marked {len(newly_unreachable)} unreachable cells as obstacles and updated obstacles.csv")
+        log(f"[info] Marked {len(newly_unreachable)} unreachable cells as obstacles and updated obstacles.csv")
 
     # 2) Inflate obstacles by 1 cell for safety buffer (NOT persisted)
     inflated_blocked: Set[Coord] = inflate_obstacles(base_blocked, valid, width, height, radius=1)
-    buffer_only: Set[Coord] = inflated_blocked - base_blocked  # show as '+' in ASCII / gray in PNG
+    buffer_only: Set[Coord] = inflated_blocked - base_blocked  # overlay only
 
-    # 3) Run A* using the inflated obstacle set
-    path = astar(width, height, start, goal, inflated_blocked, valid, diagonal=args.diagonal)
+    # 3) Run A* using the inflated obstacle set + cable limit
+    path = astar(width, height, start, goal, inflated_blocked, valid,
+                 diagonal=args.diagonal, cable_limit_ft=cable_limit)
 
     # 4) ASCII (render even if no path found)
     if not args.no_map:
-        send_message_to_frontend(
+        print(
             render_ascii(
                 width, height, start, goal,
                 base_blocked,         # real (persisted) obstacles
@@ -420,26 +453,21 @@ def main(argv: List[str]) -> int:
             show_grid=args.grid_lines, show_legend=not args.no_legend,
             buffer=buffer_only
         )
-        send_message_to_frontend(f"[info] PNG saved: {args.png_out}")
+        log(f"[info] PNG saved: {args.png_out}")
 
     # 6) Path reporting / CSV
     if path is None:
-        # Helpful hints if start/goal fell inside the safety buffer
         if start in buffer_only and start not in base_blocked:
-            send_message_to_frontend("[hint] Start is inside the 1-cell safety buffer. Move it at least 1 cell away from obstacles.")
+            log("[hint] Start is inside the 1-cell safety buffer. Move it at least 1 cell away from obstacles.")
         if goal in buffer_only and goal not in base_blocked:
-            send_message_to_frontend("[hint] Goal is inside the 1-cell safety buffer. Move it at least 1 cell away from obstacles.")
-        # Reporting for length limit
-        if args.max_length != float('inf'):
-            send_message_to_frontend(f"No path found (length limit {args.max_length})")
-        else:
-            send_message_to_frontend("No path found.")
+            log("[hint] Goal is inside the 1-cell safety buffer. Move it at least 1 cell away from obstacles.")
+        log(f"No path found (cable limit {cable_limit:.3f} ft).")
         return 1
 
-    length = path_length(path)
-    send_message_to_frontend(f"Path length: {length:.3f}")
-    send_message_to_frontend(f"Start: {start}  Goal: {goal}")
-    send_message_to_frontend(f"Path nodes ({len(path)}): {path}")
+    length_ft = path_length_feet(path)
+    log(f"Path length: {length_ft:.3f} ft (limit {cable_limit:.3f} ft)")
+    log(f"Start: {start}  Goal: {goal}")
+    log(f"Path nodes ({len(path)}): {path}")
     write_path_csv(path)
 
     return 0

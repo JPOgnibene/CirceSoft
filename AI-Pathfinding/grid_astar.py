@@ -15,6 +15,7 @@ This version includes:
 import argparse, math, sys, os
 from typing import Dict, List, Optional, Set, Tuple
 import pandas as pd
+import requests
 
 # -------------------------
 # Hardcoded file paths
@@ -53,6 +54,18 @@ def parse_rc(token: str) -> Coord:
         raise ValueError(f"Could not parse RC coordinate from: {token!r}")
     row, col = int(parts[0]), int(parts[1])
     return (col, row)
+
+def send_message_to_frontend(message: str):
+    url = "http://localhost:8000/send-astar-message"
+    try:
+        response = requests.post(url, json={"message": message})
+        if response.status_code == 200:
+            send_message_to_frontend("Message sent to frontend successfully")
+        else:
+            send_message_to_frontend(f"Failed to send message: {response.status_code} {response.text}")
+    except Exception as e:
+        send_message_to_frontend(f"Exception sending message to frontend: {e}")
+
 
 # ------------------------- A* helpers -------------------------
 
@@ -308,9 +321,9 @@ def write_path_csv(path: List[Coord]) -> None:
             w.writerow(["col", "row"])
             for x, y in path:
                 w.writerow([x, y])
-        print(f"[info] Path saved to {OUTPUT_PATH_CSV} ({len(path)} points)")
+        send_message_to_frontend(f"[info] Path saved to {OUTPUT_PATH_CSV} ({len(path)} points)")
     except Exception as e:
-        print(f"[warn] Could not write path CSV: {e}")
+        send_message_to_frontend(f"[warn] Could not write path CSV: {e}")
 
 # ------------------------- CLI -------------------------
 
@@ -344,7 +357,7 @@ def main(argv: List[str]) -> int:
     base_blocked: Set[Coord] = set(pt for pt in blocked_raw if pt in valid)  # persisted obstacles only
 
     if not valid:
-        print("Grid CSV produced an empty set of valid cells.", file=sys.stderr)
+        send_message_to_frontend("Grid CSV produced an empty set of valid cells.", file=sys.stderr)
         return 2
 
     # Bounds from valid set (image space is 0..max)
@@ -373,7 +386,7 @@ def main(argv: List[str]) -> int:
     if newly_unreachable:
         base_blocked |= newly_unreachable
         _update_obstacles_csv(obs_df, newly_unreachable)
-        print(f"[info] Marked {len(newly_unreachable)} unreachable cells as obstacles and updated obstacles.csv")
+        send_message_to_frontend(f"[info] Marked {len(newly_unreachable)} unreachable cells as obstacles and updated obstacles.csv")
 
     # 2) Inflate obstacles by 1 cell for safety buffer (NOT persisted)
     inflated_blocked: Set[Coord] = inflate_obstacles(base_blocked, valid, width, height, radius=1)
@@ -384,7 +397,7 @@ def main(argv: List[str]) -> int:
 
     # 4) ASCII (render even if no path found)
     if not args.no_map:
-        print(
+        send_message_to_frontend(
             render_ascii(
                 width, height, start, goal,
                 base_blocked,         # real (persisted) obstacles
@@ -407,26 +420,26 @@ def main(argv: List[str]) -> int:
             show_grid=args.grid_lines, show_legend=not args.no_legend,
             buffer=buffer_only
         )
-        print(f"[info] PNG saved: {args.png_out}")
+        send_message_to_frontend(f"[info] PNG saved: {args.png_out}")
 
     # 6) Path reporting / CSV
     if path is None:
         # Helpful hints if start/goal fell inside the safety buffer
         if start in buffer_only and start not in base_blocked:
-            print("[hint] Start is inside the 1-cell safety buffer. Move it at least 1 cell away from obstacles.")
+            send_message_to_frontend("[hint] Start is inside the 1-cell safety buffer. Move it at least 1 cell away from obstacles.")
         if goal in buffer_only and goal not in base_blocked:
-            print("[hint] Goal is inside the 1-cell safety buffer. Move it at least 1 cell away from obstacles.")
+            send_message_to_frontend("[hint] Goal is inside the 1-cell safety buffer. Move it at least 1 cell away from obstacles.")
         # Reporting for length limit
         if args.max_length != float('inf'):
-            print(f"No path found (length limit {args.max_length})")
+            send_message_to_frontend(f"No path found (length limit {args.max_length})")
         else:
-            print("No path found.")
+            send_message_to_frontend("No path found.")
         return 1
 
     length = path_length(path)
-    print(f"Path length: {length:.3f}")
-    print(f"Start: {start}  Goal: {goal}")
-    print(f"Path nodes ({len(path)}): {path}")
+    send_message_to_frontend(f"Path length: {length:.3f}")
+    send_message_to_frontend(f"Start: {start}  Goal: {goal}")
+    send_message_to_frontend(f"Path nodes ({len(path)}): {path}")
     write_path_csv(path)
 
     return 0

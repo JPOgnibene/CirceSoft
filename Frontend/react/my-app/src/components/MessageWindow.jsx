@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef } f
 const MessageWindow = forwardRef((props, ref) => {
   const [messages, setMessages] = useState([]);
   const messagesEndRef = useRef(null);
+  const ws = useRef(null);
 
   // Expose addMessage function to parent components
   useImperativeHandle(ref, () => ({
@@ -20,6 +21,39 @@ const MessageWindow = forwardRef((props, ref) => {
     }
   }));
 
+  // WebSocket connection for listening to backend astar messages
+  useEffect(() => {
+    ws.current = new WebSocket("ws://localhost:8000/ws/astarmessages");
+
+    ws.current.onopen = () => {
+      console.log("WebSocket connected");
+    };
+
+    ws.current.onmessage = (event) => {
+      try {
+        const messageData = JSON.parse(event.data);
+        if (messageData.type === "astar_message") {
+          ref.current.addMessage("info", messageData.content);
+        }
+      } catch (e) {
+        console.error("Failed to parse WebSocket message", e);
+      }
+    };
+
+    ws.current.onerror = (error) => {
+      console.error("WebSocket error", error);
+    };
+
+    ws.current.onclose = () => {
+      console.log("WebSocket disconnected");
+    };
+
+    // Cleanup on unmount
+    return () => {
+      ws.current.close();
+    };
+  }, [ref]);
+
   // Auto scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -30,7 +64,7 @@ const MessageWindow = forwardRef((props, ref) => {
   };
 
   return (
-    <div className="message_window">      
+    <div className="message_window">
       <div className="messages">
         {messages.length === 0 ? (
           <div className="hazard info">

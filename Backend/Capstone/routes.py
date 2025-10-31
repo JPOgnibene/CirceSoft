@@ -29,6 +29,53 @@ router = APIRouter()
 ## Must do: set filepath for generated path
 PATH_FILE = ""
 
+
+# --- Connection Manager for WebSocket clients ---
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: dict):
+        disconnected = []
+        for connection in self.active_connections:
+            try:
+                await connection.send_json(message)
+            except Exception:
+                disconnected.append(connection)
+        for connection in disconnected:
+            self.active_connections.remove(connection)
+
+# Create global manager instance
+manager = ConnectionManager()
+
+# --- WebSocket endpoint for astar messages ---
+@router.websocket("/ws/astarmessages")
+async def astar_messages_websocket(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            # Just keep connection alive and listen optionally, or remove if not needed
+            await asyncio.sleep(1)
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+
+# --- REST endpoint to receive astar messages from backend script ---
+@router.post("/send-astar-message")
+async def send_astar_message(body: Dict[str, Any] = Body(...)):
+    message = body.get("message", "")
+    if not message:
+        return JSONResponse({"error": "No message provided"}, status_code=400)
+    # Broadcast message to all connected websocket clients
+    await manager.broadcast({"type": "astar_message", "content": message})
+    return {"status": "message sent"}
+
 # --- Helper for Errors ---
 def _not_found(name: str) -> JSONResponse:
     return JSONResponse({"error": f"{name} not found"}, status_code=404)
@@ -226,6 +273,7 @@ async def get_path_progress(current_x: float, current_y: float):
         "distance_traveled": traveled,
         "total_path_length": total
     }
+
 
 @router.get("/grid/bundle")
 async def get_grid_bundle():

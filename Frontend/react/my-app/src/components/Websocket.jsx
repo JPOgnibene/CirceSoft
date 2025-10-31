@@ -21,13 +21,12 @@ class GridClientWS {
    * @param {function} onConnectionChange - Callback for connection status changes.
    */
   constructor(onMessage, onConnectionChange) {
-    this.url = `ws://localhost:8000${WS_PATH}`;
+    this.url = `ws://localhost:8765${WS_PATH}`;
     this.socket = null;
     this.onMessage = onMessage;
     this.onConnectionChange = onConnectionChange;
     this.reconnectTimeout = null;
     this.manualDisconnect = false;
-    this.wasConnected = false; // Track if we were previously connected
   }
 
   connect() {
@@ -41,7 +40,6 @@ class GridClientWS {
 
     this.socket.onopen = () => {
       console.log('WebSocket Connected.');
-      this.wasConnected = true;
       this.onConnectionChange?.(true);
     };
 

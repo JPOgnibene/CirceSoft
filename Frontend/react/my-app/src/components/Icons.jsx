@@ -1,21 +1,21 @@
 // src/components/Icons.jsx
 import React from "react";
 
-export const WebsocketStatusIcon = ({ messageBoxRef }) => {
-  const handleClick = () => {
-    messageBoxRef.current?.addMessage('info', 'Websocket Status Icon was clicked');
-  };
+// export const WebsocketStatusIcon = ({ messageBoxRef }) => {
+//   const handleClick = () => {
+//     messageBoxRef.current?.addMessage('info', 'Websocket Status Icon was clicked');
+//   };
 
-  return (
-    <img
-      id="toggleImage"
-      src="/contents/images/websocket_connection_off.png"
-      alt="Websocket Status"
-      onClick={handleClick}
-      style={{ cursor: 'pointer' }}
-    />
-  );
-};
+//   return (
+//     <img
+//       id="toggleImage"
+//       src="/contents/images/websocket_connection_off.png"
+//       alt="Websocket Status"
+//       onClick={handleClick}
+//       style={{ cursor: 'pointer' }}
+//     />
+//   );
+// };
 
 export const ImportPathIcon = ({ messageBoxRef }) => {
   const handleClick = () => {

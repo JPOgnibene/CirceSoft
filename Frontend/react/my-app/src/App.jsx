@@ -1,27 +1,22 @@
 import React, { useRef, useState } from 'react';
 import './App.css';
 import MessageWindow from './components/MessageWindow';
-import WebsocketTester from "./components/WebsocketTester";
 import MapView from "./components/MapView";
 import Slider from "./components/Slider";
 import EmergencyStop from "./components/Stop";
 import SendToCirceBot from "./components/SendToCirceBot"
 import IsMovingStatus from "./components/BotMoving"
 import ImportPathIcon from './components/ImportPathIcon';
-
+import { WebSocketProvider, WebsocketStatusIcon } from "./components/Websocket";
 import {
-  WebsocketStatusIcon,
   PlayButtonIcon,
   PauseButtonIcon,
   WaypointIcon,
   TargetIcon,
   OnPathIcon,
 } from "./components/Icons";
-import { useReducer } from 'react';
-import ClickToPath from './components/ClickToPath';
 
-function App() {
-  const messageBoxRef = useRef();
+function AppContent({ messageBoxRef }) {
   const [completionProgress, setValue] = useState(0);
   const [path, setPath] = useState([]); // store clicked dots (manipulated in ClickToPath.jsx)
 
@@ -30,13 +25,12 @@ function App() {
     setPath(importedPath);
   };
 
-
   return (
     <div>
       <header className="header">
         <div className="icons">
           <div className="icon">
-            <WebsocketStatusIcon messageBoxRef={messageBoxRef }/>
+            <WebsocketStatusIcon messageBoxRef={messageBoxRef} />
           </div>
           <div className="clickIcon">
             <ImportPathIcon messageBoxRef={messageBoxRef} onPathImported={handlePathImported}/>
@@ -77,21 +71,29 @@ function App() {
           <SendToCirceBot path={path} />
         </div>
       </header>
-
       {/* Main Content Area */}
       <div className="content">
-        <MessageWindow ref={ messageBoxRef } />
-        {/* <WebsocketTester /> */}
+        <MessageWindow ref={messageBoxRef} />
         <div className="map_feed">
-        <MapView 
-        sliderValue={completionProgress} 
-        path={path} 
-        setPath={setPath} 
-        messageBoxRef={messageBoxRef} 
-        />
+          <MapView 
+            sliderValue={completionProgress} 
+            path={path} 
+            setPath={setPath} 
+            messageBoxRef={messageBoxRef} 
+          />
         </div>
       </div>
     </div>
+  );
+}
+
+function App() {
+  const messageBoxRef = useRef();
+
+  return (
+    <WebSocketProvider messageBoxRef={messageBoxRef}>
+      <AppContent messageBoxRef={messageBoxRef} />
+    </WebSocketProvider>
   );
 }
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-grid_astar.py (headless)
+grid_astar.py (headless with cooldown + default watcher)
+
 A* shortest path with:
 - JSON inputs from API endpoints (no CSVs, no rendering):
     GET http://localhost:8000/obstacles  -> [{"row": r, "col": c}, ...]
@@ -9,7 +10,13 @@ A* shortest path with:
 - One-cell safety buffer (inflation) around obstacles (not persisted)
 - Cable-length limit, anisotropic step costs (ft): X=7.5, Y=5.16129, Diag=9.104334
 - Posts computed path JSON to: POST http://localhost:8000/path
-- Periodic watcher (--watch) polls endpoints and auto-recomputes on changes
+- Periodic watcher (default) polls endpoints and auto-recomputes on changes
+- NEW: Cooldown after compute (default 2.0s) to avoid rapid re-runs
+
+Run once (no watcher):
+    python grid_astar.py --once --diagonal --cable-ft 300
+Run watcher (default):
+    python grid_astar.py --diagonal --interval 2.0 --cooldown 2.0
 """
 
 import argparse, math, sys, os, time, hashlib, json
@@ -33,13 +40,15 @@ COST_DIAG = 9.104334  # (±1,±1) steps
 
 Coord = Tuple[int, int]  # (x=col, y=row)
 
-# ------------------------- Logging -------------------------
-
+# -------------------------
+# Logging
+# -------------------------
 def log(msg: str) -> None:
     print(msg, flush=True)
 
-# ------------------------- Endpoint I/O -------------------------
-
+# -------------------------
+# Endpoint I/O
+# -------------------------
 def _xy_from_any(d: dict) -> Coord:
     if "col" in d and "row" in d:
         return (int(d["col"]), int(d["row"]))
@@ -83,8 +92,9 @@ def post_path_json(path: List[Coord], total_feet: float) -> None:
     r = requests.post(POST_PATH_URL, json=body, timeout=5)
     r.raise_for_status()
 
-# ------------------------- Geometry / Costs -------------------------
-
+# -------------------------
+# Geometry / Costs
+# -------------------------
 def in_bounds(p: Coord, width: int, height: int) -> bool:
     x, y = p
     return 0 <= x < width and 0 <= y < height
@@ -117,8 +127,9 @@ def path_length_feet(path: Optional[List[Coord]]) -> float:
     for u, v in zip(path, path[1:]): total += step_cost(u, v)
     return total
 
-# ------------------------- A* -------------------------
-
+# -------------------------
+# A*
+# -------------------------
 def reconstruct(came_from: Dict[Coord, Coord], current: Coord) -> List[Coord]:
     path = [current]
     while current in came_from:
@@ -168,8 +179,9 @@ def astar(width: int, height: int, start: Coord, goal: Coord,
                 heappush(open_heap, (f, nxt))
     return None
 
-# ------------------------- Safety buffer -------------------------
-
+# -------------------------
+# Safety buffer
+# -------------------------
 def inflate_obstacles(blocked: Set[Coord], valid: Set[Coord], width: int, height: int, radius: int = 1) -> Set[Coord]:
     if radius <= 0: return set(blocked)
     inflated = set(blocked)
@@ -182,8 +194,9 @@ def inflate_obstacles(blocked: Set[Coord], valid: Set[Coord], width: int, height
                 inflated.add(p)
     return inflated
 
-# ------------------------- Planner core -------------------------
-
+# -------------------------
+# Planner core
+# -------------------------
 def compute_and_post(args) -> int:
     try:
         obstacles_list = get_obstacles()
@@ -250,8 +263,9 @@ def compute_and_post(args) -> int:
 
     return 0
 
-# ------------------------- Watcher -------------------------
-
+# -------------------------
+# Watcher (with debounce + cooldown)
+# -------------------------
 def _stable_hash_json(obj) -> str:
     """Stable hash for change detection (handles lists/dicts recursively)."""
     def _normalize(o):
@@ -271,11 +285,12 @@ def _fetch_raw():
     return obstacles_raw, waypoints_raw
 
 def run_watcher(args) -> None:
-    log(f"[watch] Starting watcher: interval={args.interval:.3f}s, debounce={args.debounce_ms}ms")
+    log(f"[watch] Starting watcher: interval={args.interval:.3f}s, debounce={args.debounce_ms}ms, cooldown={args.cooldown:.3f}s")
     last_obs_hash = None
     last_wp_hash  = None
     last_rc = None
     debounce_deadline = 0.0
+    last_compute_end_ts = 0.0  # for cooldown
 
     while True:
         t0 = time.time()
@@ -291,13 +306,21 @@ def run_watcher(args) -> None:
                 last_wp_hash  = h_wp
                 log("[watch] Change detected. Debouncing...")
 
-            if last_obs_hash is not None and last_wp_hash is not None and time.time() >= debounce_deadline:
+            # Ready to recompute only if:
+            # 1) We have initial hashes,
+            # 2) Debounce window has expired,
+            # 3) Cooldown since the last compute has elapsed.
+            now = time.time()
+            cooldown_ok = (now - last_compute_end_ts) >= args.cooldown
+            if last_obs_hash is not None and last_wp_hash is not None and now >= debounce_deadline and cooldown_ok:
                 rc = compute_and_post(args)
+                last_compute_end_ts = time.time()  # start cooldown AFTER compute ends
                 if rc != last_rc:
                     status = "OK" if rc == 0 else f"ERR({rc})"
                     log(f"[watch] Recompute status: {status}")
                 last_rc = rc
-                debounce_deadline = float("inf")  # wait for next change
+                # Reset debounce until we see a new change
+                debounce_deadline = float("inf")
         except KeyboardInterrupt:
             log("[watch] Stopped by user.")
             break
@@ -307,23 +330,25 @@ def run_watcher(args) -> None:
         dt = time.time() - t0
         time.sleep(max(0.0, args.interval - dt))
 
-# ------------------------- CLI -------------------------
-
+# -------------------------
+# CLI
+# -------------------------
 def main(argv: List[str]) -> int:
     ap = argparse.ArgumentParser(description="A* with JSON endpoints + waypoints + cable limit + watcher (headless).")
     ap.add_argument("--diagonal", action="store_true", help="Allow 8-way movement.")
     ap.add_argument("--cable-ft", type=float, default=CABLE_MAX_FT, help="Cable length budget in feet.")
-    # Watcher options
-    ap.add_argument("--watch", action="store_true", help="Continuously poll endpoints and auto-recompute on changes.")
+    # Watcher options (watch is default; use --once to run once and exit)
+    ap.add_argument("--once", action="store_true", help="Run a single compute and exit (disables watcher).")
     ap.add_argument("--interval", type=float, default=2.0, help="Polling interval in seconds (default 2.0).")
     ap.add_argument("--debounce-ms", type=int, default=150, help="Debounce window in milliseconds (default 150).")
+    ap.add_argument("--cooldown", type=float, default=2.0, help="Cooldown after compute in seconds (default 2.0).")
     args = ap.parse_args(argv)
 
-    if args.watch:
+    if args.once:
+        return compute_and_post(args)
+    else:
         run_watcher(args)
         return 0
-    else:
-        return compute_and_post(args)
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))

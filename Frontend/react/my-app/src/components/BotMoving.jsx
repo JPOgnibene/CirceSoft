@@ -43,7 +43,7 @@ function IsMovingStatus({ messageBoxRef }) {
 
     // Fetch immediately, then every 2 seconds
     fetchStatus();
-    const interval = setInterval(fetchStatus, 2000);
+    const interval = setInterval(fetchStatus, 10000);
 
     // Cleanup interval on unmount
     return () => clearInterval(interval);

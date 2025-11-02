@@ -24,6 +24,7 @@ const ClickToPath = ({
   const scale = transformContext?.state?.scale ?? 1;
 
   const PATH_ENDPOINT = "http://localhost:8765/grid/path";
+  const WAYPOINT_ENDPOINT = "http://localhost:8765/waypoints"
 
   useEffect(() => {
     const el = containerRef.current;
@@ -45,14 +46,19 @@ const ClickToPath = ({
       }
       return;
     }
+    // create a "label" tag in the json put request to json. label the first coordinate as "start" and the last as "end", and the rest as "waypoint":
 
-    const pathData = path.map(point => ({
-      r: point.y,
-      c: point.x
-    }));
+    const pathData = path.map((point, index) => {
+      if (index === 0) {
+        return { r: point.y, c: point.x, label: "START" };
+      } else if (index === path.length - 1) {
+        return { r: point.y, c: point.x, label: "END" };
+      }
+      return { r: point.y, c: point.x, label: "WAYPOINT" };
+    });
 
     try {
-      const response = await fetch(PATH_ENDPOINT, {
+      const response = await fetch(WAYPOINT_ENDPOINT, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(pathData),

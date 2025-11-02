@@ -4,13 +4,13 @@ grid_astar.py (headless, diagonals always enabled, watcher by default)
 
 A* shortest path with:
 - JSON inputs from API endpoints (no CSVs, no rendering):
-    GET http://localhost:8000/obstacles  -> [{"row": r, "col": c}, ...]
-    GET http://localhost:8000/waypoints  -> [{"row": r, "col": c, "type": "start|waypoint|end"}, ...]
+    GET http://localhost:8765/obstacles  -> [{"row": r, "col": c}, ...]
+    GET http://localhost:8765/waypoints  -> [{"row": r, "col": c, "type": "start|waypoint|end"}, ...]
 - Required waypoint chain: start -> waypoint1 -> ... -> end
 - Always uses 8-way (diagonal) movement for efficient routing
 - One-cell safety buffer (inflation) around obstacles (not persisted)
 - Cable-length limit, anisotropic step costs (ft): X=7.5, Y=5.16129, Diag=9.104334
-- Posts computed path JSON to: POST http://localhost:8000/path
+- Posts computed path JSON to: POST http://localhost:8765/path
 - Periodic watcher (default) polls endpoints and auto-recomputes on changes
 - Cooldown after compute (default 2s) to avoid rapid re-runs
 """
@@ -22,9 +22,9 @@ import requests
 # -------------------------
 # API endpoints
 # -------------------------
-OBSTACLES_URL = "http://localhost:8000/obstacles"
-WAYPOINTS_URL = "http://localhost:8000/waypoints"
-POST_PATH_URL = "http://localhost:8000/path"
+OBSTACLES_URL = "http://localhost:8765/obstacles"
+WAYPOINTS_URL = "http://localhost:8765/waypoints"
+POST_PATH_URL = "http://localhost:8765/path"
 
 # -------------------------
 # Cable + per-step distances (feet)

@@ -1,0 +1,52 @@
+<?xml version="1.0" ?>
+<sdf version="1.9">
+  <world name="football_world">
+    <gravity>0 0 -9.81</gravity>
+
+    <scene>
+      <ambient>0.5 0.5 0.5 1</ambient>
+      <background>0.7 0.7 0.8 1</background>
+    </scene>
+
+    <!-- Static textured plane: 110x60 m -->
+    <model name="football_field">
+      <static>true</static>
+      <pose>0 0 0 0 0 0</pose>
+      <link name="field_link">
+        <visual name="field_visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>110 60</size>
+            </plane>
+          </geometry>
+          <material>
+            <pbr>
+              <metal>
+                <!-- NOTE: world/ .. media/ -->
+                <albedo_map>ALBEDO_PATH</albedo_map>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+
+        <collision name="field_collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>110 60</size>
+            </plane>
+          </geometry>
+        </collision>
+      </link>
+    </model>
+
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0.3 0.3 0</pose>
+      <diffuse>1 1 1 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <direction>-0.5 0.2 -1</direction>
+    </light>
+  </world>
+</sdf>

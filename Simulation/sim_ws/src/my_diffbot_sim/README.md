@@ -1,0 +1,1 @@
+# my_diffbot_sim football field world\nLaunch with `ros2 launch my_diffbot_sim sim.launch.py`\n

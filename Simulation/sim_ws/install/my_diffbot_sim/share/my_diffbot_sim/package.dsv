@@ -1,0 +1,15 @@
+source;share/my_diffbot_sim/hook/path.ps1
+source;share/my_diffbot_sim/hook/path.dsv
+source;share/my_diffbot_sim/hook/path.sh
+source;share/my_diffbot_sim/hook/pythonpath.ps1
+source;share/my_diffbot_sim/hook/pythonpath.dsv
+source;share/my_diffbot_sim/hook/pythonpath.sh
+source;share/my_diffbot_sim/hook/pythonscriptspath.ps1
+source;share/my_diffbot_sim/hook/pythonscriptspath.dsv
+source;share/my_diffbot_sim/hook/pythonscriptspath.sh
+source;share/my_diffbot_sim/hook/ament_prefix_path.ps1
+source;share/my_diffbot_sim/hook/ament_prefix_path.dsv
+source;share/my_diffbot_sim/hook/ament_prefix_path.sh
+source;../../build/my_diffbot_sim/share/my_diffbot_sim/hook/pythonpath_develop.ps1
+source;../../build/my_diffbot_sim/share/my_diffbot_sim/hook/pythonpath_develop.dsv
+source;../../build/my_diffbot_sim/share/my_diffbot_sim/hook/pythonpath_develop.sh

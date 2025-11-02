@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<robot name="diffbot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:property name="wheel_radius" value="0.05"/>
+  <xacro:property name="wheel_sep"    value="0.28"/>
+  <xacro:property name="body_len"     value="0.30"/>
+  <xacro:property name="body_w"       value="0.25"/>
+  <xacro:property name="body_h"       value="0.12"/>
+  <link name="base_link">
+    <inertial><origin xyz="0 0 0.05"/><mass value="4.0"/>
+      <inertia ixx="0.05" ixy="0" ixz="0" iyy="0.08" iyz="0" izz="0.09"/></inertial>
+    <visual><origin xyz="0 0 ${body_h/2}"/>
+      <geometry><box size="${body_len} ${body_w} ${body_h}"/></geometry>
+      <material name="grey"><color rgba="0.6 0.6 0.7 1"/></material></visual>
+    <collision><origin xyz="0 0 ${body_h/2}"/>
+      <geometry><box size="${body_len} ${body_w} ${body_h}"/></geometry></collision>
+  </link>
+  <link name="left_wheel">
+    <inertial><origin xyz="0 0 0"/><mass value="0.2"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/></inertial>
+    <visual><geometry><cylinder length="0.02" radius="${wheel_radius}"/></geometry></visual>
+    <collision><geometry><cylinder length="0.02" radius="${wheel_radius}"/></geometry></collision>
+  </link>
+  <link name="right_wheel">
+    <inertial><origin xyz="0 0 0"/><mass value="0.2"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/></inertial>
+    <visual><geometry><cylinder length="0.02" radius="${wheel_radius}"/></geometry></visual>
+    <collision><geometry><cylinder length="0.02" radius="${wheel_radius}"/></geometry></collision>
+  </link>
+  <joint name="left_wheel_joint" type="continuous">
+    <parent link="base_link"/><child link="left_wheel"/>
+    <origin xyz="0 ${wheel_sep/2} ${wheel_radius}"/><axis xyz="0 1 0"/>
+  </joint>
+  <joint name="right_wheel_joint" type="continuous">
+    <parent link="base_link"/><child link="right_wheel"/>
+    <origin xyz="0 -${wheel_sep/2} ${wheel_radius}"/><axis xyz="0 -1 0"/>
+  </joint>
+  <gazebo>
+    <plugin filename="libgz-sim-diff-drive-system.so" name="gz::sim::systems::DiffDrive">
+      <left_joint>left_wheel_joint</left_joint>
+      <right_joint>right_wheel_joint</right_joint>
+      <wheel_separation>${wheel_sep}</wheel_separation>
+      <wheel_radius>${wheel_radius}</wheel_radius>
+      <odom_frame>odom</odom_frame>
+      <base_frame>base_link</base_frame>
+      <topic>cmd_vel</topic>
+      <odom_topic>odom</odom_topic>
+    </plugin>
+    <plugin filename="libgz-sim-joint-state-publisher-system.so" name="gz::sim::systems::JointStatePublisher"/>
+  </gazebo>
+</robot>

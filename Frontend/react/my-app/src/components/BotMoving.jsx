@@ -1,25 +1,35 @@
 // src/components/IsMovingStatus.jsx
 import React, { useEffect, useState, useRef } from "react";
-
-const API_URL = "http://localhost:8765/current-values";
+import { useWebSocket } from './Websocket'; // Adjust path as needed
 
 function IsMovingStatus({ messageBoxRef }) {
   const [isMoving, setIsMoving] = useState(false);
   const [error, setError] = useState(null);
   const previousIsMoving = useRef(null); // Track previous state
+  const ws = useWebSocket();
 
   useEffect(() => {
-    // Function to fetch and parse the endpoint
-    const fetchStatus = async () => {
-      try {
-        const response = await fetch(API_URL);
-        if (!response.ok) throw new Error("Network response was not ok");
-        const text = await response.text();
-        
-        // Parse the "isMoving" line (e.g. "isMoving=true")
-        const match = text.match(/isMoving=(true|false)/);
-        if (match) {
-          const newIsMoving = match[1] === "true";
+    // Only proceed if WebSocket is available
+    if (!ws) {
+      console.warn('WebSocket not available in IsMovingStatus');
+      return;
+    }
+
+    // Store the original onMessage handler
+    const originalHandler = ws.wsClient?.onMessage;
+
+    // Create our custom handler that wraps the original
+    const handleWebSocketMessage = (message) => {
+      // Call the original handler first
+      if (originalHandler) {
+        originalHandler(message);
+      }
+
+      // Handle current_values_update messages
+      if (message.type === 'current_values_update' && message.data) {
+        // Check if isMoving field exists in the update
+        if ('isMoving' in message.data) {
+          const newIsMoving = message.data.isMoving === true;
           
           // Only update and show message if the value has changed
           if (previousIsMoving.current !== null && previousIsMoving.current !== newIsMoving) {
@@ -34,20 +44,23 @@ function IsMovingStatus({ messageBoxRef }) {
           // Update state and ref
           setIsMoving(newIsMoving);
           previousIsMoving.current = newIsMoving;
+          setError(null); // Clear any previous errors
         }
-      } catch (err) {
-        console.error("Error fetching current_values:", err);
-        setError(err);
       }
     };
 
-    // Fetch immediately, then every 2 seconds
-    fetchStatus();
-    const interval = setInterval(fetchStatus, 2000);
+    // Replace the WebSocket handler
+    if (ws.wsClient) {
+      ws.wsClient.onMessage = handleWebSocketMessage;
+    }
 
-    // Cleanup interval on unmount
-    return () => clearInterval(interval);
-  }, [messageBoxRef]);
+    // Cleanup: restore original handler on unmount
+    return () => {
+      if (ws.wsClient && originalHandler) {
+        ws.wsClient.onMessage = originalHandler;
+      }
+    };
+  }, [ws, messageBoxRef]);
 
   // Simple visual indicator
   return (

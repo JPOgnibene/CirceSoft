@@ -8,7 +8,7 @@ const Slider = ({ onChange }) => {
     setValue(newValue);
     if (onChange) {
       onChange(newValue);
-      console.log("Value updated to", newValue);
+      // console.log("Value updated to", newValue);
     }
   };
 

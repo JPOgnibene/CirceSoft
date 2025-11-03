@@ -4,7 +4,7 @@
 
   // Set these to your original image's width and height
 
-  export default function MapView({ sliderValue, path, setPath, messageBoxRef }) {
+  export default function MapView({ path, setPath, messageBoxRef }) {
     const [imgDimensions, setImgDimensions] = useState({ width: 0, height: 0 });
     const [image, setBackgroundImg] = useState(null);
     
@@ -71,8 +71,8 @@
                 }}
               >
                 <ClickToPath 
-                  pathProgress={sliderValue} 
-                  path={path} setPath={setPath} 
+                  path={path} 
+                  setPath={setPath} 
                   imgDimensions={imgDimensions}
                   setImgDimensions={setImgDimensions}
                   image={image}

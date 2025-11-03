@@ -119,15 +119,79 @@ class GridClientWS {
 // WebSocket Provider Component
 export const WebSocketProvider = ({ children, messageBoxRef }) => {
   const [isConnected, setIsConnected] = useState(false);
+  const [distanceTraveled, setDistanceTraveled] = useState(0);
+  const [isMoving, setIsMoving] = useState(false);
   const wsClientRef = useRef(null);
+
+  // Helper function to format changes for display
+  const formatChanges = (type, data) => {
+    if (!data) return 'No data';
+
+    switch (type) {
+      case 'current_values_update':
+        // Display key-value pairs of current values
+        const values = Object.entries(data)
+          .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
+          .join(', ');
+        return values || 'Empty';
+
+      case 'path_update':
+        // Display number of path points
+        if (Array.isArray(data)) {
+          return `${data.length} points: ${data.slice(0, 3).map(p => `(${p.r},${p.c})`).join(', ')}${data.length > 3 ? '...' : ''}`;
+        }
+        return JSON.stringify(data);
+
+      case 'directions_update':
+        // Display directions array
+        if (Array.isArray(data)) {
+          return `${data.length} steps: ${data.slice(0, 5).join(', ')}${data.length > 5 ? '...' : ''}`;
+        }
+        return JSON.stringify(data);
+
+      case 'obstacles_update':
+        // Display number of obstacles
+        if (Array.isArray(data)) {
+          return `${data.length} obstacles: ${data.slice(0, 3).map(o => `(${o.r},${o.c})`).join(', ')}${data.length > 3 ? '...' : ''}`;
+        }
+        return JSON.stringify(data);
+
+      case 'waypoints_update':
+        // Display number of waypoints
+        if (Array.isArray(data)) {
+          return `${data.length} waypoints: ${data.slice(0, 3).map(w => `(${w.r},${w.c})`).join(', ')}${data.length > 3 ? '...' : ''}`;
+        }
+        return JSON.stringify(data);
+
+      default:
+        return JSON.stringify(data);
+    }
+  };
 
   // Handler for incoming WebSocket messages
   const handleServerUpdates = (message) => {
     console.log('Received Update:', message);
     
-    // Log to message box if available
+    // Handle distance traveled and movement status updates
+    // Check both top-level and nested in data object
+    const distanceTraveled = message.distanceTraveled ?? message.data?.distanceTraveled;
+    const isMoving = message.isMoving ?? message.data?.isMoving;
+    
+    if (distanceTraveled !== undefined) {
+      console.log('Setting distanceTraveled to:', distanceTraveled);
+      setDistanceTraveled(distanceTraveled);
+    }
+    
+    if (isMoving !== undefined) {
+      console.log('Setting isMoving to:', isMoving);
+      setIsMoving(isMoving);
+    }
+    
+    // Log to message box if available with detailed changes
     if (messageBoxRef?.current) {
-      messageBoxRef.current.addMessage('ws', `WS Update: ${message.type || 'unknown'}`);
+      const messageType = message.type || 'unknown';
+      const changes = formatChanges(messageType, message.data);
+      messageBoxRef.current.addMessage('ws', `${messageType}: ${changes}`);
     }
 
     // Handle different message types
@@ -168,10 +232,13 @@ export const WebSocketProvider = ({ children, messageBoxRef }) => {
         wsClientRef.current.disconnect();
       }
     };
-  }, []);
+  }, []); // Empty dependency array - only run once
 
-  const value = {
+  // Create the context value object - this will update when state changes
+  const contextValue = {
     isConnected,
+    distanceTraveled,
+    isMoving,
     wsClient: wsClientRef.current,
     connect: () => wsClientRef.current?.connect(),
     disconnect: () => wsClientRef.current?.disconnect(),
@@ -180,8 +247,17 @@ export const WebSocketProvider = ({ children, messageBoxRef }) => {
     updateObstacles: (obstacles) => wsClientRef.current?.updateObstacles(obstacles),
   };
 
+  // Add debug logging when state changes
+  useEffect(() => {
+    console.log('WebSocket Context State Updated:', {
+      isConnected,
+      distanceTraveled,
+      isMoving
+    });
+  }, [isConnected, distanceTraveled, isMoving]);
+
   return (
-    <WebSocketContext.Provider value={value}>
+    <WebSocketContext.Provider value={contextValue}>
       {children}
     </WebSocketContext.Provider>
   );

@@ -151,6 +151,30 @@ async def get_waypoints():
     if data is None:
         return _not_found("waypoints")
     return JSONResponse({"data": data}, headers=_nocache_headers())
+@router.put("/waypoints")
+async def put_waypoints(waypoints: List[Dict[str, Any]] = Body(...)):
+    cleaned_data = []
+    # Input validation remains the same
+    for wp in waypoints:
+        if isinstance(wp, dict) and 'r' in wp and 'c' in wp:
+            try:
+                # cleaned_data.append({'r': int(wp['r']), 'c': int(wp['c'])})
+                cleaned_wp = {'r': int(wp['r']), 'c': int(wp['c'])}
+                if 'label' in wp:
+                    cleaned_wp['label'] = str(wp['label'])
+                cleaned_data.append(cleaned_wp)
+            except (ValueError, TypeError):
+                continue
+    
+    if not cleaned_data and waypoints:
+        return JSONResponse({"error": "Invalid input format. Expected list of {'r': int, 'c': int}."}, status_code=400)
+
+    _write_waypoints_json(WAYPOINTS_PATH, cleaned_data) # Updated writer
+    
+    return JSONResponse(
+        {"status": "Waypoints updated successfully", "count": len(cleaned_data)},
+        headers=_nocache_headers(),
+    )
 
 # -------- Grid Endpoints --------
 

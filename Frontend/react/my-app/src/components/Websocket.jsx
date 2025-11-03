@@ -119,6 +119,8 @@ class GridClientWS {
 // WebSocket Provider Component
 export const WebSocketProvider = ({ children, messageBoxRef }) => {
   const [isConnected, setIsConnected] = useState(false);
+  const [distanceTraveled, setDistanceTraveled] = useState(0);
+  const [isMoving, setIsMoving] = useState(false);
   const wsClientRef = useRef(null);
 
   // Helper function to format changes for display
@@ -170,6 +172,21 @@ export const WebSocketProvider = ({ children, messageBoxRef }) => {
   const handleServerUpdates = (message) => {
     console.log('Received Update:', message);
     
+    // Handle distance traveled and movement status updates
+    // Check both top-level and nested in data object
+    const distanceTraveled = message.distanceTraveled ?? message.data?.distanceTraveled;
+    const isMoving = message.isMoving ?? message.data?.isMoving;
+    
+    if (distanceTraveled !== undefined) {
+      console.log('Setting distanceTraveled to:', distanceTraveled);
+      setDistanceTraveled(distanceTraveled);
+    }
+    
+    if (isMoving !== undefined) {
+      console.log('Setting isMoving to:', isMoving);
+      setIsMoving(isMoving);
+    }
+    
     // Log to message box if available with detailed changes
     if (messageBoxRef?.current) {
       const messageType = message.type || 'unknown';
@@ -215,10 +232,13 @@ export const WebSocketProvider = ({ children, messageBoxRef }) => {
         wsClientRef.current.disconnect();
       }
     };
-  }, []);
+  }, []); // Empty dependency array - only run once
 
-  const value = {
+  // Create the context value object - this will update when state changes
+  const contextValue = {
     isConnected,
+    distanceTraveled,
+    isMoving,
     wsClient: wsClientRef.current,
     connect: () => wsClientRef.current?.connect(),
     disconnect: () => wsClientRef.current?.disconnect(),
@@ -227,8 +247,17 @@ export const WebSocketProvider = ({ children, messageBoxRef }) => {
     updateObstacles: (obstacles) => wsClientRef.current?.updateObstacles(obstacles),
   };
 
+  // Add debug logging when state changes
+  useEffect(() => {
+    console.log('WebSocket Context State Updated:', {
+      isConnected,
+      distanceTraveled,
+      isMoving
+    });
+  }, [isConnected, distanceTraveled, isMoving]);
+
   return (
-    <WebSocketContext.Provider value={value}>
+    <WebSocketContext.Provider value={contextValue}>
       {children}
     </WebSocketContext.Provider>
   );

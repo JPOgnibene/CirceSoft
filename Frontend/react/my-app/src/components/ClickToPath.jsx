@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useTransformContext } from "react-zoom-pan-pinch";
+import { useWebSocket } from "./Websocket"; // Import the WebSocket hook
 import GridMap from "./GridMap";
 
 const ClickToPath = ({
-  pathProgress,
   path,
   setPath,
   imgDimensions,
@@ -18,13 +18,29 @@ const ClickToPath = ({
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragPosition, setDragPosition] = useState(null);
-  const [justFinishedDrag, setJustFinishedDrag] = useState(false);
+  
+  // Get WebSocket data - store in local state to ensure re-renders
+  const ws = useWebSocket();
+  const [distanceTraveled, setDistanceTraveled] = useState(0);
+  const [isMoving, setIsMoving] = useState(false);
+  
+  // Update local state when WebSocket values change
+  useEffect(() => {
+    if (ws) {
+      setDistanceTraveled(ws.distanceTraveled || 0);
+      setIsMoving(ws.isMoving || false);
+      console.log('ClickToPath - Distance updated:', ws.distanceTraveled, 'Moving:', ws.isMoving);
+    }
+  }, [ws?.distanceTraveled, ws?.isMoving]);
   
   const transformContext = useTransformContext();
   const scale = transformContext?.state?.scale ?? 1;
 
   const PATH_ENDPOINT = "http://localhost:8765/grid/path";
-  const WAYPOINT_ENDPOINT = "http://localhost:8765/waypoints"
+  const WAYPOINT_ENDPOINT = "http://localhost:8765/waypoints";
+  
+  // CONFIGURATION: Real-world size of one grid cell
+  const GRID_CELL_SIZE_FEET = 2; // Change this to match your actual grid cell size
 
   useEffect(() => {
     const el = containerRef.current;
@@ -38,6 +54,34 @@ const ClickToPath = ({
     return () => window.removeEventListener("resize", resize);
   }, []);
 
+  // Calculate Euclidean distance between two points in grid coordinates
+  const calculateDistance = (point1, point2) => {
+    const dx = point2.x - point1.x;
+    const dy = point2.y - point1.y;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  // Calculate total path length in grid units and real-world units
+  const calculatePathLength = () => {
+    if (path.length < 2) {
+      return { gridUnits: 0, feet: 0, meters: 0 };
+    }
+
+    let totalDistance = 0;
+    for (let i = 0; i < path.length - 1; i++) {
+      totalDistance += calculateDistance(path[i], path[i + 1]);
+    }
+
+    const distanceFeet = totalDistance * GRID_CELL_SIZE_FEET;
+    const distanceMeters = distanceFeet * 0.3048; // Convert feet to meters
+
+    return {
+      gridUnits: totalDistance,
+      feet: distanceFeet,
+      meters: distanceMeters
+    };
+  };
+
   // Export path to server
   const exportPath = async () => {
     if (path.length === 0) {
@@ -46,8 +90,11 @@ const ClickToPath = ({
       }
       return;
     }
-    // create a "label" tag in the json put request to json. label the first coordinate as "start" and the last as "end", and the rest as "waypoint":
 
+    // Calculate path length
+    const pathLength = calculatePathLength();
+
+    // Create path data with labels
     const pathData = path.map((point, index) => {
       if (index === 0) {
         return { r: point.y, c: point.x, label: "START" };
@@ -70,9 +117,14 @@ const ClickToPath = ({
       
       const result = await response.json();
       console.log("Path exported:", result);
+      console.log("Path length:", pathLength);
       
       if (messageBoxRef?.current) {
-        messageBoxRef.current.addMessage('success', `Path exported: ${path.length} waypoints`);
+        messageBoxRef.current.addMessage(
+          'success', 
+          `Path exported: ${path.length} waypoints, ` +
+          `Distance: ${pathLength.feet.toFixed(2)} ft (${pathLength.meters.toFixed(2)} m)`
+        );
       }
     } catch (error) {
       console.error("Failed to export path:", error);
@@ -227,23 +279,58 @@ const ClickToPath = ({
     return { px, py };
   };
 
-  const getPosition = () => {
+  // Calculate position based on distance traveled (in feet)
+  const getPositionFromDistance = () => {
     if (path.length === 0) return { x: 0, y: 0, index: 0 };
     if (path.length === 1) return { ...path[0], index: 0 };
-    const totalSegments = path.length - 1;
-    const pos = (pathProgress / 100) * totalSegments;
-    const index = Math.floor(pos);
-    const t = pos - index;
-    const start = path[index];
-    const end = path[Math.min(index + 1, path.length - 1)];
-    return {
-      x: start.x + (end.x - start.x) * t,
-      y: start.y + (end.y - start.y) * t,
-      index,
-    };
+    
+    // Calculate cumulative distances along the path
+    const segmentDistances = [];
+    let cumulativeDistance = 0;
+    
+    for (let i = 0; i < path.length - 1; i++) {
+      const segmentLength = calculateDistance(path[i], path[i + 1]) * GRID_CELL_SIZE_FEET;
+      segmentDistances.push({
+        start: cumulativeDistance,
+        end: cumulativeDistance + segmentLength,
+        length: segmentLength,
+        startPoint: path[i],
+        endPoint: path[i + 1],
+        index: i
+      });
+      cumulativeDistance += segmentLength;
+    }
+    
+    // Clamp distance traveled to the total path length
+    const clampedDistance = Math.min(Math.max(0, distanceTraveled), cumulativeDistance);
+    
+    console.log('getPositionFromDistance - Distance:', distanceTraveled, 'Clamped:', clampedDistance, 'Total:', cumulativeDistance);
+    
+    // Find which segment the bot is currently on
+    for (let i = 0; i < segmentDistances.length; i++) {
+      const segment = segmentDistances[i];
+      if (clampedDistance >= segment.start && clampedDistance <= segment.end) {
+        // Calculate position within this segment
+        const distanceInSegment = clampedDistance - segment.start;
+        const t = segment.length > 0 ? distanceInSegment / segment.length : 0;
+        
+        const position = {
+          x: segment.startPoint.x + (segment.endPoint.x - segment.startPoint.x) * t,
+          y: segment.startPoint.y + (segment.endPoint.y - segment.startPoint.y) * t,
+          index: segment.index,
+        };
+        
+        console.log('Position calculated:', position, 'Segment:', i, 't:', t);
+        return position;
+      }
+    }
+    
+    // If we've traveled the full distance, return the end point
+    console.log('At end of path');
+    return { ...path[path.length - 1], index: path.length - 1 };
   };
 
-  const currentDot = getPosition();
+  const currentDot = getPositionFromDistance();
   const { px, py } = graphToPixel(currentDot);
 
   let completed = [];
@@ -254,10 +341,13 @@ const ClickToPath = ({
     remaining = [{ x: currentDot.x, y: currentDot.y }, ...path.slice(currentDot.index + 1)];
   }
 
+  // Calculate current path length for display
+  const pathLength = calculatePathLength();
+
   return (
     <>
       {/* === MODE TOGGLE === */}
-      <div style={{ marginBottom: "8px", display: "flex", gap: "10px", alignItems: "center" }}>
+      <div style={{ marginBottom: "8px", display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
         <button
           onClick={() => setMode("path")}
           style={{
@@ -285,7 +375,7 @@ const ClickToPath = ({
           Obstacle Mode
         </button>
         
-        <div style={{ marginLeft: "20px", display: "flex", gap: "10px" }}>
+        <div style={{ display: "flex", gap: "10px" }}>
           <button
             onClick={exportPath}
             disabled={path.length === 0}
@@ -315,6 +405,44 @@ const ClickToPath = ({
             Clear Path
           </button>
         </div>
+        
+        {/* Display current path length and distance traveled */}
+        {path.length > 1 && (
+          <div style={{ 
+            display: "flex",
+            gap: "10px",
+            flexWrap: "wrap"
+          }}>
+            <div style={{ 
+              padding: "6px 12px", 
+              backgroundColor: "#333", 
+              color: "white", 
+              borderRadius: "6px",
+              fontSize: "0.9rem"
+            }}>
+              Total: {pathLength.feet.toFixed(2)} ft ({pathLength.meters.toFixed(2)} m)
+            </div>
+            <div style={{ 
+              padding: "6px 12px", 
+              backgroundColor: isMoving ? "#4CAF50" : "#666", 
+              color: "white", 
+              borderRadius: "6px",
+              fontSize: "0.9rem"
+            }}>
+              Traveled: {distanceTraveled.toFixed(2)} ft ({(distanceTraveled * 0.3048).toFixed(2)} m)
+              {isMoving && " 🚶"}
+            </div>
+            <div style={{ 
+              padding: "6px 12px", 
+              backgroundColor: "#555", 
+              color: "white", 
+              borderRadius: "6px",
+              fontSize: "0.9rem"
+            }}>
+              Progress: {pathLength.feet > 0 ? ((distanceTraveled / pathLength.feet) * 100).toFixed(1) : 0}%
+            </div>
+          </div>
+        )}
       </div>
 
       <div
@@ -474,6 +602,7 @@ const ClickToPath = ({
               width: 32 * scale,
               height: 32 * scale,
               pointerEvents: "none",
+              filter: isMoving ? "none" : "grayscale(0.5) opacity(0.7)",
             }}
           />
         </div>

@@ -76,10 +76,9 @@ function AppContent({ messageBoxRef }) {
         <MessageWindow ref={messageBoxRef} />
         <div className="map_feed">
           <MapView 
-            sliderValue={completionProgress} 
             path={path} 
             setPath={setPath} 
-            messageBoxRef={messageBoxRef} 
+            messageBoxRef={messageBoxRef}
           />
         </div>
       </div>

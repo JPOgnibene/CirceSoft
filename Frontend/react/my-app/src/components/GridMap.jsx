@@ -7,9 +7,16 @@ const GridMap = ({
   image, 
   setGridBounds, 
   messageBoxRef,
+  onExportObstacles,
+  onClearObstacles,
+  onRevertObstacles,
+  onObstacleCountChange,
+  onUnsavedChangesChange,
 }) => {
   const [gridData, setGridData] = useState([]);
   const [obstacles, setObstacles] = useState([]);
+  const [unsavedObstacles, setUnsavedObstacles] = useState([]); // Track local changes
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isDraggingObstacle, setIsDraggingObstacle] = useState(false);
   const [lastObstaclePoint, setLastObstaclePoint] = useState(null);
   const imgRef = useRef(null);
@@ -65,6 +72,7 @@ const GridMap = ({
         // Handle both {data: [...]} or direct array format
         const obstaclesData = json.data || json || [];
         setObstacles(obstaclesData);
+        setUnsavedObstacles(obstaclesData); // Initialize unsaved with current obstacles
       } catch (error) {
         console.error("Failed to fetch obstacle data:", error);
       }
@@ -72,7 +80,7 @@ const GridMap = ({
     fetchObstacles();
   }, []);
 
-  const isObstacle = (r, c) => obstacles.some((obs) => obs.r === r && obs.c === c);
+  const isObstacle = (r, c) => unsavedObstacles.some((obs) => obs.r === r && obs.c === c);
 
   // Get the pixel coordinates for a grid point
   const getGridPointCoords = (r, c) => {
@@ -161,50 +169,8 @@ const GridMap = ({
     }
   };
 
-  // Drag to add/remove obstacles
-  // useEffect(() => {
-  //   const handleMouseMove = (e) => {
-  //     if (!isDraggingObstacle) return;
-  //     if (gridData.length === 0) return;
-  //     const svg = svgRef.current;
-  //     if (!svg) return;
-  //     const rect = svg.getBoundingClientRect();
-  //     const moveX = e.clientX - rect.left;
-  //     const moveY = e.clientY - rect.top;
-  //     const svgX = (moveX / rect.width) * imgDimensions.width;
-  //     const svgY = (moveY / rect.height) * imgDimensions.height;
-  //     let closestPoint = null;
-  //     let minDistance = Infinity; 
-  //     gridData.forEach((point) => {
-  //       const dx = point.x - svgX;
-  //       const dy = point.y - svgY;
-  //       const distance = Math.sqrt(dx * dx + dy * dy);
-  //       if (distance < minDistance) {
-  //         minDistance = distance;
-  //         closestPoint = point;
-  //       }
-  //     });
-  //     if (closestPoint) {
-  //       if (!lastObstaclePoint || lastObstaclePoint.r !== closestPoint.r || lastObstaclePoint.c !== closestPoint.c) {
-  //         handlePointClick(closestPoint);
-  //         setLastObstaclePoint(closestPoint);
-  //       }
-  //     }
-  //   };
-
-  //   const handleMouseUp = () => {
-  //     setIsDraggingObstacle(false);
-  //     setLastObstaclePoint(null);
-  //   };
-  //   window.addEventListener("mousemove", handleMouseMove);
-  //   window.addEventListener("mouseup", handleMouseUp);  
-  //   return () => {
-  //     window.removeEventListener("mousemove", handleMouseMove);
-  //     window.removeEventListener("mouseup", handleMouseUp);
-  //   };
-  // }, [isDraggingObstacle, lastObstaclePoint, gridData]);
-
-  const handlePointClick = async (point) => {
+  // Handle adding/removing obstacles locally (no server call)
+  const handlePointClick = (point) => {
     if (mode !== "obstacle") return;
 
     const { r, c } = point;
@@ -212,35 +178,107 @@ const GridMap = ({
     let added = true;
 
     if (isObstacle(r, c)) {
-      updatedObstacles = obstacles.filter((obs) => !(obs.r === r && obs.c === c));
-      console.log(`Removing obstacle at (r=${r}, c=${c})`);
+      updatedObstacles = unsavedObstacles.filter((obs) => !(obs.r === r && obs.c === c));
+      console.log(`Removing obstacle at (r=${r}, c=${c}) - NOT SAVED YET`);
       added = false;
+      if (messageBoxRef?.current) {
+        messageBoxRef.current.addMessage('info', `Obstacle removed at (${r}, ${c}) - not saved`);
+      }
     } else {
-      updatedObstacles = [...obstacles, { r, c }];
-      console.log(`Adding obstacle at (r=${r}, c=${c})`);
+      updatedObstacles = [...unsavedObstacles, { r, c }];
+      console.log(`Adding obstacle at (r=${r}, c=${c}) - NOT SAVED YET`);
       added = true;
+      if (messageBoxRef?.current) {
+        messageBoxRef.current.addMessage('info', `Obstacle added at (${r}, ${c}) - not saved`);
+      }
     }
 
-    setObstacles(updatedObstacles);
+    setUnsavedObstacles(updatedObstacles);
+    setHasUnsavedChanges(true);
+  };
 
+  // Export obstacles to server
+  const exportObstacles = async () => {
     try {
       const response = await fetch(OBSTACLE_ENDPOINT, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatedObstacles),
+        body: JSON.stringify(unsavedObstacles),
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error: ${response.status}`);
+      }
+      
       const result = await response.json();
-      if (!response.ok) throw new Error(`Failed: ${result.error || response.statusText}`);
-      console.log("Obstacles updated:", result);
+      console.log("Obstacles exported:", result);
+      
+      // Update the saved obstacles state
+      setObstacles(unsavedObstacles);
+      setHasUnsavedChanges(false);
       
       if (messageBoxRef?.current) {
-        if (added) messageBoxRef.current.addMessage('success', `Obstacle added at (${r}, ${c})`);
-        else messageBoxRef.current.addMessage('info', `Obstacle removed at (${r}, ${c})`);
+        messageBoxRef.current.addMessage(
+          'success', 
+          `Obstacles exported: ${unsavedObstacles.length} total obstacles`
+        );
       }
     } catch (error) {
-      console.error("Error updating obstacles:", error);
+      console.error("Failed to export obstacles:", error);
+      if (messageBoxRef?.current) {
+        messageBoxRef.current.addMessage('error', 'Failed to export obstacles');
+      }
     }
   };
+
+  // Clear all obstacles
+  const clearObstacles = () => {
+    setUnsavedObstacles([]);
+    setHasUnsavedChanges(true);
+    if (messageBoxRef?.current) {
+      messageBoxRef.current.addMessage('info', 'All obstacles cleared - not saved');
+    }
+  };
+
+  // Revert to last saved state
+  const revertObstacles = () => {
+    setUnsavedObstacles(obstacles);
+    setHasUnsavedChanges(false);
+    if (messageBoxRef?.current) {
+      messageBoxRef.current.addMessage('info', 'Changes reverted to last saved state');
+    }
+  };
+
+  useEffect(() => {
+    if (onExportObstacles) {
+      onExportObstacles.current = exportObstacles;
+    }
+  }, [unsavedObstacles, hasUnsavedChanges]);
+
+  useEffect(() => {
+    if (onClearObstacles) {
+      onClearObstacles.current = clearObstacles;
+    }
+  }, [unsavedObstacles]);
+
+  useEffect(() => {
+    if (onRevertObstacles) {
+      onRevertObstacles.current = revertObstacles;
+    }
+  }, [obstacles, unsavedObstacles, hasUnsavedChanges]);
+
+  // ADD THESE TWO NEW HOOKS RIGHT HERE:
+  useEffect(() => {
+    if (onObstacleCountChange) {
+      onObstacleCountChange(unsavedObstacles.length);
+    }
+  }, [unsavedObstacles.length, onObstacleCountChange]);
+
+  useEffect(() => {
+    if (onUnsavedChangesChange) {
+      onUnsavedChangesChange(hasUnsavedChanges);
+    }
+  }, [hasUnsavedChanges, onUnsavedChangesChange]);
 
   return (
     <div
@@ -363,8 +401,8 @@ const GridMap = ({
             />
           );
         })}
-      </svg>
-    </div>
+        </svg>
+      </div>
   );
 };
 

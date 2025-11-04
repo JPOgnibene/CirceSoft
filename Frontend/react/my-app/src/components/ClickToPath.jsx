@@ -19,6 +19,13 @@ const ClickToPath = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragPosition, setDragPosition] = useState(null);
   
+  // Obstacle refs and state - MOVED INSIDE THE COMPONENT
+  const exportObstaclesRef = useRef(null);
+  const clearObstaclesRef = useRef(null);
+  const revertObstaclesRef = useRef(null);
+  const [obstacleCount, setObstacleCount] = useState(0);
+  const [hasUnsavedObstacleChanges, setHasUnsavedObstacleChanges] = useState(false);
+  
   // Get WebSocket data - store in local state to ensure re-renders
   const ws = useWebSocket();
   const [distanceTraveled, setDistanceTraveled] = useState(0);
@@ -375,73 +382,137 @@ const ClickToPath = ({
           Obstacle Mode
         </button>
         
-        <div style={{ display: "flex", gap: "10px" }}>
-          <button
-            onClick={exportPath}
-            disabled={path.length === 0}
-            style={{
-              backgroundColor: path.length > 0 ? "#2196F3" : "#ccc",
-              color: "white",
-              padding: "6px 12px",
-              border: "none",
-              borderRadius: "6px",
-              cursor: path.length > 0 ? "pointer" : "not-allowed",
-            }}
-          >
-            Export Path
-          </button>
-          <button
-            onClick={clearPath}
-            disabled={path.length === 0}
-            style={{
-              backgroundColor: path.length > 0 ? "#FF9800" : "#ccc",
-              color: "white",
-              padding: "6px 12px",
-              border: "none",
-              borderRadius: "6px",
-              cursor: path.length > 0 ? "pointer" : "not-allowed",
-            }}
-          >
-            Clear Path
-          </button>
-        </div>
+        {/* PATH CONTROLS */}
+        {mode === "path" && (
+          <>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button
+                onClick={exportPath}
+                disabled={path.length === 0}
+                style={{
+                  backgroundColor: path.length > 0 ? "#2196F3" : "#ccc",
+                  color: "white",
+                  padding: "6px 12px",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: path.length > 0 ? "pointer" : "not-allowed",
+                }}
+              >
+                Export Path
+              </button>
+              <button
+                onClick={clearPath}
+                disabled={path.length === 0}
+                style={{
+                  backgroundColor: path.length > 0 ? "#FF9800" : "#ccc",
+                  color: "white",
+                  padding: "6px 12px",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: path.length > 0 ? "pointer" : "not-allowed",
+                }}
+              >
+                Clear Path
+              </button>
+            </div>
+            
+            {path.length > 1 && (
+              <div style={{ 
+                display: "flex",
+                gap: "10px",
+                flexWrap: "wrap"
+              }}>
+                <div style={{ 
+                  padding: "6px 12px", 
+                  backgroundColor: "#333", 
+                  color: "white", 
+                  borderRadius: "6px",
+                  fontSize: "0.9rem"
+                }}>
+                  Total: {pathLength.feet.toFixed(2)} ft ({pathLength.meters.toFixed(2)} m)
+                </div>
+                <div style={{ 
+                  padding: "6px 12px", 
+                  backgroundColor: isMoving ? "#4CAF50" : "#666", 
+                  color: "white", 
+                  borderRadius: "6px",
+                  fontSize: "0.9rem"
+                }}>
+                  Traveled: {distanceTraveled.toFixed(2)} ft ({(distanceTraveled * 0.3048).toFixed(2)} m)
+                  {isMoving && " 🚶"}
+                </div>
+                <div style={{ 
+                  padding: "6px 12px", 
+                  backgroundColor: "#555", 
+                  color: "white", 
+                  borderRadius: "6px",
+                  fontSize: "0.9rem"
+                }}>
+                  Progress: {pathLength.feet > 0 ? ((distanceTraveled / pathLength.feet) * 100).toFixed(1) : 0}%
+                </div>
+              </div>
+            )}
+          </>
+        )}
         
-        {/* Display current path length and distance traveled */}
-        {path.length > 1 && (
-          <div style={{ 
-            display: "flex",
-            gap: "10px",
-            flexWrap: "wrap"
-          }}>
+        {/* OBSTACLE CONTROLS */}
+        {mode === "obstacle" && (
+          <>
+            <button
+              onClick={() => exportObstaclesRef.current?.()}
+              disabled={!hasUnsavedObstacleChanges}
+              style={{
+                backgroundColor: hasUnsavedObstacleChanges ? "#2196F3" : "#ccc",
+                color: "white",
+                padding: "6px 12px",
+                border: "none",
+                borderRadius: "6px",
+                cursor: hasUnsavedObstacleChanges ? "pointer" : "not-allowed",
+                fontWeight: hasUnsavedObstacleChanges ? "bold" : "normal"
+              }}
+            >
+              Export Obstacles {hasUnsavedObstacleChanges && "●"}
+            </button>
+            <button
+              onClick={() => clearObstaclesRef.current?.()}
+              disabled={obstacleCount === 0}
+              style={{
+                backgroundColor: obstacleCount > 0 ? "#FF9800" : "#ccc",
+                color: "white",
+                padding: "6px 12px",
+                border: "none",
+                borderRadius: "6px",
+                cursor: obstacleCount > 0 ? "pointer" : "not-allowed",
+              }}
+            >
+              Clear All
+            </button>
+            <button
+              onClick={() => revertObstaclesRef.current?.()}
+              disabled={!hasUnsavedObstacleChanges}
+              style={{
+                backgroundColor: hasUnsavedObstacleChanges ? "#f44336" : "#ccc",
+                color: "white",
+                padding: "6px 12px",
+                border: "none",
+                borderRadius: "6px",
+                cursor: hasUnsavedObstacleChanges ? "pointer" : "not-allowed",
+              }}
+            >
+              Revert Changes
+            </button>
             <div style={{ 
+              marginLeft: "auto",
               padding: "6px 12px", 
               backgroundColor: "#333", 
               color: "white", 
               borderRadius: "6px",
               fontSize: "0.9rem"
             }}>
-              Total: {pathLength.feet.toFixed(2)} ft ({pathLength.meters.toFixed(2)} m)
+              Obstacles: {obstacleCount}
+              {hasUnsavedObstacleChanges && " (unsaved)"}
             </div>
-            <div style={{ 
-              padding: "6px 12px", 
-              backgroundColor: isMoving ? "#4CAF50" : "#666", 
-              color: "white", 
-              borderRadius: "6px",
-              fontSize: "0.9rem"
-            }}>
-              Traveled: {distanceTraveled.toFixed(2)} ft ({(distanceTraveled * 0.3048).toFixed(2)} m)
-              {isMoving && " 🚶"}
-            </div>
-            <div style={{ 
-              padding: "6px 12px", 
-              backgroundColor: "#555", 
-              color: "white", 
-              borderRadius: "6px",
-              fontSize: "0.9rem"
-            }}>
-              Progress: {pathLength.feet > 0 ? ((distanceTraveled / pathLength.feet) * 100).toFixed(1) : 0}%
-            </div>
-          </div>
+          </>
         )}
       </div>
 
@@ -469,6 +540,11 @@ const ClickToPath = ({
             setImgDimensions={setImgDimensions} 
             image={image}
             messageBoxRef={messageBoxRef}
+            onExportObstacles={exportObstaclesRef}
+            onClearObstacles={clearObstaclesRef}
+            onRevertObstacles={revertObstaclesRef}
+            onObstacleCountChange={setObstacleCount}
+            onUnsavedChangesChange={setHasUnsavedObstacleChanges}
           />
           
           {/* === PATH DRAWING === */}

@@ -2,12 +2,13 @@ import React, { useRef, useState } from 'react';
 import './App.css';
 import MessageWindow from './components/MessageWindow';
 import MapView from "./components/MapView";
-import Slider from "./components/Slider";
+import Progress from "./components/Progress";
 import EmergencyStop from "./components/Stop";
-import SendToCirceBot from "./components/SendToCirceBot"
-import IsMovingStatus from "./components/BotMoving"
+import SendToCirceBot from "./components/SendToCirceBot";
+import IsMovingStatus from "./components/BotMoving";
 import ImportPathIcon from './components/ImportPathIcon';
-import { WebSocketProvider, WebsocketStatusIcon } from "./components/Websocket";
+import PathControls from './components/PathControls';
+import { WebSocketProvider, WebsocketStatusIcon, useWebSocket } from "./components/Websocket";
 import {
   PlayButtonIcon,
   PauseButtonIcon,
@@ -18,13 +19,84 @@ import {
 
 function AppContent({ messageBoxRef }) {
   const [completionProgress, setValue] = useState(0);
-  const [path, setPath] = useState([]); // store clicked dots (manipulated in ClickToPath.jsx)
-
+  const [path, setPath] = useState([]);
+  const [mode, setMode] = useState("path");
+  const [obstacleCount, setObstacleCount] = useState(0);
+  const [hasUnsavedObstacleChanges, setHasUnsavedObstacleChanges] = useState(false);
+  
+  // Refs for obstacle functions
+  const exportObstaclesRef = useRef(null);
+  const clearObstaclesRef = useRef(null);
+  const revertObstaclesRef = useRef(null);
+  
+  // Refs for path functions
+  const exportPathRef = useRef(null);
+  const clearPathRef = useRef(null);
+  
+  // Get WebSocket data
+  const ws = useWebSocket();
+  const distanceTraveled = ws?.distanceTraveled || 0;
+  const isMoving = ws?.isMoving || false;
+  
   // Handler for imported path
   const handlePathImported = (importedPath) => {
     setPath(importedPath);
   };
-
+  
+  // Calculate path length (same logic as in ClickToPath)
+  const GRID_CELL_SIZE_FEET = 2;
+  const calculateDistance = (point1, point2) => {
+    const dx = point2.x - point1.x;
+    const dy = point2.y - point1.y;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+  
+  const calculatePathLength = () => {
+    if (path.length < 2) {
+      return { gridUnits: 0, feet: 0, meters: 0 };
+    }
+    let totalDistance = 0;
+    for (let i = 0; i < path.length - 1; i++) {
+      totalDistance += calculateDistance(path[i], path[i + 1]);
+    }
+    const distanceFeet = totalDistance * GRID_CELL_SIZE_FEET;
+    const distanceMeters = distanceFeet * 0.3048;
+    return { gridUnits: totalDistance, feet: distanceFeet, meters: distanceMeters };
+  };
+  
+  const pathLength = calculatePathLength();
+  
+  // Handlers for PathControls
+  const handleExportPath = () => {
+    if (exportPathRef.current) {
+      exportPathRef.current();
+    }
+  };
+  
+  const handleClearPath = () => {
+    if (clearPathRef.current) {
+      clearPathRef.current();
+    }
+  };
+  
+  const handleExportObstacles = () => {
+    if (exportObstaclesRef.current) {
+      exportObstaclesRef.current();
+    }
+  };
+  
+  const handleClearObstacles = () => {
+    if (clearObstaclesRef.current) {
+      clearObstaclesRef.current();
+    }
+  };
+  
+  const handleRevertObstacles = () => {
+    if (revertObstaclesRef.current) {
+      revertObstaclesRef.current();
+    }
+  };
+  
   return (
     <div>
       <header className="header">
@@ -55,7 +127,7 @@ function AppContent({ messageBoxRef }) {
           </div>
         </div>
         <div className="progress-container">
-          <Slider onChange={setValue}/>
+          <Progress/>
         </div>
         <div className="spacer"></div>
         <label className="switch">
@@ -71,14 +143,41 @@ function AppContent({ messageBoxRef }) {
           <SendToCirceBot path={path} />
         </div>
       </header>
+      
       {/* Main Content Area */}
       <div className="content">
-        <MessageWindow ref={messageBoxRef} />
+        <div className="message_window">
+          <PathControls
+            mode={mode}
+            setMode={setMode}
+            path={path}
+            pathLength={pathLength}
+            distanceTraveled={distanceTraveled}
+            isMoving={isMoving}
+            obstacleCount={obstacleCount}
+            hasUnsavedObstacleChanges={hasUnsavedObstacleChanges}
+            onExportPath={handleExportPath}
+            onClearPath={handleClearPath}
+            onExportObstacles={handleExportObstacles}
+            onClearObstacles={handleClearObstacles}
+            onRevertObstacles={handleRevertObstacles}
+          />
+          <MessageWindow ref={messageBoxRef} />
+        </div>
         <div className="map_feed">
           <MapView 
             path={path} 
             setPath={setPath} 
             messageBoxRef={messageBoxRef}
+            mode={mode}
+            setMode={setMode}
+            exportObstaclesRef={exportObstaclesRef}
+            clearObstaclesRef={clearObstaclesRef}
+            revertObstaclesRef={revertObstaclesRef}
+            setObstacleCount={setObstacleCount}
+            setHasUnsavedObstacleChanges={setHasUnsavedObstacleChanges}
+            exportPathRef={exportPathRef}
+            clearPathRef={clearPathRef}
           />
         </div>
       </div>
@@ -88,7 +187,6 @@ function AppContent({ messageBoxRef }) {
 
 function App() {
   const messageBoxRef = useRef();
-
   return (
     <WebSocketProvider messageBoxRef={messageBoxRef}>
       <AppContent messageBoxRef={messageBoxRef} />

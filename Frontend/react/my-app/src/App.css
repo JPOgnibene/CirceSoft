@@ -26,23 +26,33 @@
   }
   
     /* Left window (message window) */
-    .message_window {
-      width: 30%; /* 30% of the remaining space */
-      border: 2px solid black;
-      background-color: #ecf0f1;
-      padding: 10px;
-    }
-  
-  
-    .messages {
-      height: 300px;
-      overflow-y: auto;
-      background: white;
-      border: 1px solid #ccc;
-      padding: 10px;
-      margin-top: 10px;
-      font-family: monospace;
-  }
+  .message_window {
+  width: 30%;
+  border: 2px solid black;
+  background-color: #ecf0f1;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Make sure MessageWindow component fills the width */
+.message_window > * {
+  width: 100%;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #ccc;
+  padding: 10px;
+  margin-top: 10px;
+  font-family: monospace;
+  min-height: 0;
+  width: 100%; /* Explicitly set width */
+  box-sizing: border-box; /* Include padding in width calculation */
+}
   
   .hazard {
       padding: 5px;

@@ -6,7 +6,7 @@
   
   html, body {
     height: 100%;
-    font-family: Arial, sans-serif;
+    font-family: 'Courier New', monospace;
   }
   
   /* Header bar */
@@ -48,7 +48,7 @@
   border: 1px solid #ccc;
   padding: 10px;
   margin-top: 10px;
-  font-family: monospace;
+  font-family: 'Courier New', monospace;
   min-height: 0;
   width: 100%; /* Explicitly set width */
   box-sizing: border-box; /* Include padding in width calculation */

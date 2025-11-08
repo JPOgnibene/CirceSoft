@@ -15,168 +15,298 @@ const PathControls = ({
   onClearObstacles,
   onRevertObstacles,
 }) => {
+  const buttonBaseStyle = {
+    padding: "10px 20px",
+    border: "1px solid rgba(0, 255, 159, 0.2)",
+    borderRadius: "2px",
+    cursor: "pointer",
+    fontSize: "0.85rem",
+    fontWeight: "600",
+    letterSpacing: "0.5px",
+    textTransform: "uppercase",
+    transition: "all 0.15s ease",
+    fontFamily: "'Courier New', monospace",
+    position: "relative",
+    overflow: "hidden",
+  };
+
+  const modeButtonStyle = (isActive) => ({
+    ...buttonBaseStyle,
+    backgroundColor: isActive 
+      ? (mode === "path" ? "rgba(0, 255, 159, 0.15)" : "rgba(255, 71, 87, 0.15)")
+      : "rgba(20, 25, 35, 0.8)",
+    color: isActive 
+      ? (mode === "path" ? "#00ff9f" : "#ff4757")
+      : "#6b7280",
+    borderColor: isActive 
+      ? (mode === "path" ? "#00ff9f" : "#ff4757")
+      : "rgba(107, 114, 128, 0.3)",
+    boxShadow: isActive 
+      ? `0 0 20px ${mode === "path" ? "rgba(0, 255, 159, 0.3)" : "rgba(255, 71, 87, 0.3)"}`
+      : "none",
+  });
+
+  const actionButtonStyle = (enabled, color, glowColor) => ({
+    ...buttonBaseStyle,
+    backgroundColor: enabled ? `${color}15` : "rgba(20, 25, 35, 0.5)",
+    color: enabled ? color : "#4b5563",
+    borderColor: enabled ? color : "rgba(75, 85, 99, 0.3)",
+    cursor: enabled ? "pointer" : "not-allowed",
+    boxShadow: enabled ? `0 0 15px ${glowColor}` : "none",
+  });
+
   return (
-    <div style={{ marginBottom: "8px", display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+    <div style={{ 
+      marginBottom: "16px",
+      fontFamily: "'Courier New', monospace",
+    }}>
       {/* MODE TOGGLE */}
-      <button
-        onClick={() => setMode("path")}
-        style={{
-          backgroundColor: mode === "path" ? "#4CAF50" : "#ccc",
-          color: "white",
-          padding: "6px 12px",
-          border: "none",
-          borderRadius: "6px",
-          cursor: "pointer",
-        }}
-      >
-        Path Mode
-      </button>
-      <button
-        onClick={() => setMode("obstacle")}
-        style={{
-          backgroundColor: mode === "obstacle" ? "#f44336" : "#ccc",
-          color: "white",
-          padding: "6px 12px",
-          border: "none",
-          borderRadius: "6px",
-          cursor: "pointer",
-        }}
-      >
-        Obstacle Mode
-      </button>
-      
+      <div style={{ 
+        display: "flex", 
+        gap: "12px", 
+        marginBottom: "16px",
+        padding: "6px",
+        backgroundColor: "rgba(15, 20, 30, 0.9)",
+        border: "1px solid rgba(107, 114, 128, 0.3)",
+        borderRadius: "2px",
+        width: "fit-content",
+      }}>
+        <button
+          onClick={() => setMode("path")}
+          style={modeButtonStyle(mode === "path")}
+        >
+          ◉ EDIT PATH
+        </button>
+        <button
+          onClick={() => setMode("obstacle")}
+          style={modeButtonStyle(mode === "obstacle")}
+        >
+          ▲ EDIT OBSTACLES
+        </button>
+      </div>
+
       {/* PATH CONTROLS */}
-      {mode === "path" && (
-        <>
-          <div style={{ display: "flex", gap: "10px" }}>
-            <button
-              onClick={onExportPath}
-              disabled={path.length === 0}
-              style={{
-                backgroundColor: path.length > 0 ? "#2196F3" : "#ccc",
-                color: "white",
-                padding: "6px 12px",
-                border: "none",
-                borderRadius: "6px",
-                cursor: path.length > 0 ? "pointer" : "not-allowed",
-              }}
-            >
-              Export Path
-            </button>
-            <button
-              onClick={onClearPath}
-              disabled={path.length === 0}
-              style={{
-                backgroundColor: path.length > 0 ? "#FF9800" : "#ccc",
-                color: "white",
-                padding: "6px 12px",
-                border: "none",
-                borderRadius: "6px",
-                cursor: path.length > 0 ? "pointer" : "not-allowed",
-              }}
-            >
-              Clear Path
-            </button>
-          </div>
-          
-          {path.length > 1 && (
+      <div style={{
+        maxHeight: mode === "path" ? "500px" : "0",
+        overflow: "hidden",
+        transition: "max-height 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease",
+        opacity: mode === "path" ? 1 : 0,
+      }}>
+        <div style={{ 
+          display: "flex", 
+          gap: "12px", 
+          marginBottom: "16px",
+          flexWrap: "wrap",
+          alignItems: "center"
+        }}>
+          <button
+            onClick={onExportPath}
+            disabled={path.length === 0}
+            style={actionButtonStyle(path.length > 0, "#00d9ff", "rgba(0, 217, 255, 0.2)")}
+          >
+            ⬇ EXPORT PATH
+          </button>
+          <button
+            onClick={onClearPath}
+            disabled={path.length === 0}
+            style={actionButtonStyle(path.length > 0, "#ffaa00", "rgba(255, 170, 0, 0.2)")}
+          >
+            ✕ CLEAR PATH
+          </button>
+        </div>
+        
+        {path.length > 1 && (
+          <div style={{ 
+            display: "flex",
+            gap: "12px",
+            flexWrap: "wrap",
+            animation: "slideIn 0.25s ease-out"
+          }}>
             <div style={{ 
-              display: "flex",
-              gap: "10px",
-              flexWrap: "wrap"
+              padding: "10px 16px", 
+              backgroundColor: "rgba(15, 20, 30, 0.9)", 
+              color: "#00ff9f", 
+              border: "1px solid rgba(0, 255, 159, 0.3)",
+              borderRadius: "2px",
+              fontSize: "0.8rem",
+              fontWeight: "600",
+              letterSpacing: "0.5px",
+              fontFamily: "'Courier New', monospace",
+              textTransform: "uppercase"
             }}>
-              <div style={{ 
-                padding: "6px 12px", 
-                backgroundColor: "#333", 
-                color: "white", 
-                borderRadius: "6px",
-                fontSize: "0.9rem"
-              }}>
-                Total: {pathLength.feet.toFixed(2)} ft ({pathLength.meters.toFixed(2)} m)
-              </div>
-              <div style={{ 
-                padding: "6px 12px", 
-                backgroundColor: isMoving ? "#4CAF50" : "#666", 
-                color: "white", 
-                borderRadius: "6px",
-                fontSize: "0.9rem"
-              }}>
-                Traveled: {distanceTraveled.toFixed(2)} ft ({(distanceTraveled * 0.3048).toFixed(2)} m)
-                {isMoving && " 🚶"}
-              </div>
-              <div style={{ 
-                padding: "6px 12px", 
-                backgroundColor: "#555", 
-                color: "white", 
-                borderRadius: "6px",
-                fontSize: "0.9rem"
-              }}>
-                Progress: {pathLength.feet > 0 ? ((distanceTraveled / pathLength.feet) * 100).toFixed(1) : 0}%
-              </div>
+              TOTAL <span style={{ color: "#fff", marginLeft: "8px" }}>{pathLength.feet.toFixed(2)} FT</span>
+              <span style={{ color: "#6b7280", marginLeft: "6px" }}>({pathLength.meters.toFixed(2)} M)</span>
             </div>
-          )}
-        </>
-      )}
+            <div style={{ 
+              padding: "10px 16px", 
+              backgroundColor: isMoving ? "rgba(0, 255, 159, 0.1)" : "rgba(15, 20, 30, 0.9)", 
+              color: isMoving ? "#00ff9f" : "#6b7280",
+              border: `1px solid ${isMoving ? "rgba(0, 255, 159, 0.5)" : "rgba(107, 114, 128, 0.3)"}`,
+              borderRadius: "2px",
+              fontSize: "0.8rem",
+              fontWeight: "600",
+              letterSpacing: "0.5px",
+              fontFamily: "'Courier New', monospace",
+              textTransform: "uppercase",
+              transition: "all 0.3s ease",
+              boxShadow: isMoving ? "0 0 15px rgba(0, 255, 159, 0.3)" : "none"
+            }}>
+              {isMoving ? "▶ ACTIVE" : "◼ STANDBY"} 
+              <span style={{ color: "#fff", marginLeft: "8px" }}>{distanceTraveled.toFixed(2)} FT</span>
+              <span style={{ color: "#6b7280", marginLeft: "6px" }}>({(distanceTraveled * 0.3048).toFixed(2)} M)</span>
+            </div>
+            <div style={{ 
+              padding: "10px 16px", 
+              backgroundColor: "rgba(15, 20, 30, 0.9)", 
+              color: "#00d9ff", 
+              border: "1px solid rgba(0, 217, 255, 0.3)",
+              borderRadius: "2px",
+              fontSize: "0.8rem",
+              fontWeight: "600",
+              letterSpacing: "0.5px",
+              fontFamily: "'Courier New', monospace",
+              textTransform: "uppercase"
+            }}>
+              PROGRESS <span style={{ color: "#fff", marginLeft: "8px" }}>{pathLength.feet > 0 ? ((distanceTraveled / pathLength.feet) * 100).toFixed(1) : 0}%</span>
+            </div>
+          </div>
+        )}
+      </div>
       
       {/* OBSTACLE CONTROLS */}
-      {mode === "obstacle" && (
-        <>
+      <div style={{
+        maxHeight: mode === "obstacle" ? "500px" : "0",
+        overflow: "hidden",
+        transition: "max-height 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease",
+        opacity: mode === "obstacle" ? 1 : 0,
+      }}>
+        <div style={{ 
+          display: "flex", 
+          gap: "12px", 
+          flexWrap: "wrap",
+          alignItems: "center"
+        }}>
           <button
             onClick={onExportObstacles}
             disabled={!hasUnsavedObstacleChanges}
             style={{
-              backgroundColor: hasUnsavedObstacleChanges ? "#2196F3" : "#ccc",
-              color: "white",
-              padding: "6px 12px",
-              border: "none",
-              borderRadius: "6px",
-              cursor: hasUnsavedObstacleChanges ? "pointer" : "not-allowed",
-              fontWeight: hasUnsavedObstacleChanges ? "bold" : "normal"
+              ...actionButtonStyle(hasUnsavedObstacleChanges, "#00d9ff", "rgba(0, 217, 255, 0.2)"),
+              position: "relative"
             }}
           >
-            Export Obstacles {hasUnsavedObstacleChanges && "●"}
+            ⬇ EXPORT OBSTACLES
+            {hasUnsavedObstacleChanges && (
+              <span style={{
+                position: "absolute",
+                top: "6px",
+                right: "6px",
+                width: "8px",
+                height: "8px",
+                backgroundColor: "#ff4757",
+                borderRadius: "0",
+                border: "1px solid #ff4757",
+                boxShadow: "0 0 10px rgba(255, 71, 87, 0.8)",
+                animation: "pulse 2s ease-in-out infinite"
+              }}/>
+            )}
           </button>
           <button
             onClick={onClearObstacles}
             disabled={obstacleCount === 0}
-            style={{
-              backgroundColor: obstacleCount > 0 ? "#FF9800" : "#ccc",
-              color: "white",
-              padding: "6px 12px",
-              border: "none",
-              borderRadius: "6px",
-              cursor: obstacleCount > 0 ? "pointer" : "not-allowed",
-            }}
+            style={actionButtonStyle(obstacleCount > 0, "#ffaa00", "rgba(255, 170, 0, 0.2)")}
           >
-            Clear All
+            ✕ CLEAR ALL
           </button>
           <button
             onClick={onRevertObstacles}
             disabled={!hasUnsavedObstacleChanges}
-            style={{
-              backgroundColor: hasUnsavedObstacleChanges ? "#f44336" : "#ccc",
-              color: "white",
-              padding: "6px 12px",
-              border: "none",
-              borderRadius: "6px",
-              cursor: hasUnsavedObstacleChanges ? "pointer" : "not-allowed",
-            }}
+            style={actionButtonStyle(hasUnsavedObstacleChanges, "#ff4757", "rgba(255, 71, 87, 0.2)")}
           >
-            Revert Changes
+            ↺ REVERT
           </button>
           <div style={{ 
             marginLeft: "auto",
-            padding: "6px 12px", 
-            backgroundColor: "#333", 
-            color: "white", 
-            borderRadius: "6px",
-            fontSize: "0.9rem"
+            padding: "10px 16px", 
+            backgroundColor: "rgba(15, 20, 30, 0.9)", 
+            color: "#ff4757", 
+            border: "1px solid rgba(255, 71, 87, 0.3)",
+            borderRadius: "2px",
+            fontSize: "0.8rem",
+            fontWeight: "600",
+            letterSpacing: "0.5px",
+            fontFamily: "'Courier New', monospace",
+            textTransform: "uppercase",
+            display: "flex",
+            alignItems: "center",
+            gap: "10px"
           }}>
-            Obstacles: {obstacleCount}
-            {hasUnsavedObstacleChanges && " (unsaved)"}
+            <span>OBSTACLES <span style={{ color: "#fff", marginLeft: "6px" }}>{obstacleCount}</span></span>
+            {hasUnsavedObstacleChanges && (
+              <span style={{
+                fontSize: "0.7rem",
+                padding: "3px 8px",
+                backgroundColor: "rgba(255, 71, 87, 0.2)",
+                border: "1px solid #ff4757",
+                borderRadius: "2px",
+                fontWeight: "700",
+                letterSpacing: "1px",
+                boxShadow: "0 0 10px rgba(255, 71, 87, 0.3)"
+              }}>
+                UNSAVED
+              </span>
+            )}
           </div>
-        </>
-      )}
+        </div>
+      </div>
+      
+      <style>{`
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateY(-8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.4;
+          }
+        }
+        
+        button:hover:not(:disabled) {
+          filter: brightness(1.2);
+          transform: translateY(-1px);
+        }
+        
+        button:active:not(:disabled) {
+          transform: translateY(0);
+          filter: brightness(0.9);
+        }
+        
+        button:hover:not(:disabled)::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+          animation: shine 0.6s;
+        }
+        
+        @keyframes shine {
+          to {
+            left: 100%;
+          }
+        }
+      `}</style>
     </div>
   );
 };

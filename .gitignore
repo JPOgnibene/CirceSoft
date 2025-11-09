@@ -44,7 +44,8 @@ yarn-error.log*
 
 # Virtual environments
 venv/
-
+.venv/
+Backend/Capstone/.venv/
 # npm
 .npm
 

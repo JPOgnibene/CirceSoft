@@ -7,16 +7,17 @@ function EmergencyStop({ messageBoxRef }) {
     try {
       const response = await fetch(DIRECTIONS_API, {
         method: "PUT",
-        headers: { "Content-Type": "text/plain" },
-        body: "STOP",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command: "STOP" }),
       });
-
+      
       if (!response.ok) {
         throw new Error(`Server error: ${response.status}`);
       }
-
-      const result = await response.text();
+      
+      const result = await response.json();
       console.log("Emergency STOP sent:", result);
+      
       if (messageBoxRef?.current) {
         messageBoxRef.current.addMessage('warning', 'Emergency STOP command sent to the bot');
       }

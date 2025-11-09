@@ -432,7 +432,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     last_sent_obstacles = current_obstacles_text
 
 
-            await asyncio.sleep(1) # Polling interval
+            await asyncio.sleep(0.025) # Polling interval
 
     except WebSocketDisconnect:
         print("WebSocket client disconnected.")

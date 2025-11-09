@@ -4,6 +4,7 @@ import MessageWindow from './components/MessageWindow';
 import MapView from "./components/MapView";
 import Progress from "./components/Progress";
 import EmergencyStop from "./components/Stop";
+import StartCommand from "./components/Start";
 import SendToCirceBot from "./components/SendToCirceBot";
 import IsMovingStatus from "./components/BotMoving";
 import ImportPathIcon from './components/ImportPathIcon';
@@ -126,6 +127,9 @@ function AppContent({ messageBoxRef }) {
           </div>
           <div>
             <EmergencyStop messageBoxRef={messageBoxRef} />
+          </div>
+          <div>
+            <StartCommand messageBoxRef={messageBoxRef} />
           </div>
           <div className="clickIcon">
             <TargetIcon messageBoxRef={messageBoxRef} />

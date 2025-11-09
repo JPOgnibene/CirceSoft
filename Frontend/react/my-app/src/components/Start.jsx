@@ -1,14 +1,14 @@
-import React, { useEffect } from "react";
+import React from "react";
 
 const DIRECTIONS_API = "http://localhost:8765/directions";
 
-function EmergencyStop({ messageBoxRef }) {
-  const emergencyStop = async () => {
+function StartCommand({ messageBoxRef }) {
+  const startBot = async () => {
     try {
       const response = await fetch(DIRECTIONS_API, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ command: "STOP" }),
+        body: JSON.stringify({ command: "START" }),
       });
 
       if (!response.ok) {
@@ -16,29 +16,24 @@ function EmergencyStop({ messageBoxRef }) {
       }
 
       const result = await response.json();
-      console.log("Emergency STOP sent:", result);
+      console.log("START command sent:", result);
 
       if (messageBoxRef?.current) {
-        messageBoxRef.current.addMessage('warning', 'Emergency STOP command sent to the bot');
+        messageBoxRef.current.addMessage('success', 'START command sent to the bot');
       }
     } catch (error) {
-      console.error("Error sending STOP:", error);
+      console.error("Error sending START:", error);
       if (messageBoxRef?.current) {
-        messageBoxRef.current.addMessage('error', `Failed to send STOP: ${error.message}`);
+        messageBoxRef.current.addMessage('error', `Failed to send START: ${error.message}`);
       }
     }
   };
 
-  // 🟡 Run once when the component mounts
-  useEffect(() => {
-    emergencyStop();
-  }, []); // empty dependency array → runs only once
-
   return (
     <button
-      onClick={emergencyStop}
+      onClick={startBot}
       style={{
-        backgroundColor: "red",
+        backgroundColor: "green",
         color: "white",
         fontWeight: "bold",
         fontSize: "1.2rem",
@@ -48,11 +43,11 @@ function EmergencyStop({ messageBoxRef }) {
         cursor: "pointer",
         boxShadow: "0px 4px 8px rgba(0,0,0,0.2)",
       }}
-      title="Emergency Stop"
+      title="Start Command"
     >
-      ⏹️
+      ▶️
     </button>
   );
 }
 
-export default EmergencyStop;
+export default StartCommand;

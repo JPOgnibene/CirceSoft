@@ -160,15 +160,15 @@ class Simulator:
             "Vy_ECI": SPEED_FTPS,
             "Vz_ECI": 0.0,
             "Heading": heading,
-            "cableRemaining_ft": round(max(self.cable_remaining_ft, 0.0), 4),
+            "cableRemaining": round(max(self.cable_remaining_ft, 0.0), 4),
             "percentBatteryRemaining": max(self.percent_batt, 0),
             "errorCode": 0,
             "cableDispenseStatus": True,
             "cableDispenseCommand": True,
             "SequenceNum": "" if waypoint_number_1based is None else str(waypoint_number_1based),
             "isMoving": bool(is_moving),
-            "distanceTraveled_ft": round(self.distance_traveled_ft, 4),
-            "distanceRemaining_ft": round(self.distance_remaining_ft(), 4),
+            "distanceTraveled": round(self.distance_traveled_ft, 4),
+            "distanceRemaining": round(self.distance_remaining_ft(), 4),
         }
         if note:
             payload["debug_note"] = note

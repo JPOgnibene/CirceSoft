@@ -1,12 +1,25 @@
 #!/usr/bin/env python3
 """
-CirceBot Simulator — waits for explicit START, reports cable in feet,
-handles STOP/idle properly, and logs all PUT payloads.
+CirceBot Simulator (tolerant /directions reader)
 
 Hard-coded endpoints:
-  GET  /directions
-  GET  /grid/path
-  PUT  /current-values
+  GET  http://localhost:8765/directions
+  GET  http://localhost:8765/grid/path
+  PUT  http://localhost:8765/current-values
+
+Behavior:
+  - Waits for explicit START (does not auto-start).
+  - Accepts /directions as:
+        {"directions":"START"}  OR  {"command":"START"}  OR plain "START"
+  - Loads /grid/path once and only reloads when content changes (hash).
+  - Moves 2 ft/s with custom scaling:
+        X: 7.5 ft,  Y: 5.16129 ft,  Diagonal: 9.104334 ft
+  - Tracks cableRemaining_ft (300 ft max), distanceTraveled_ft, distanceRemaining_ft.
+  - Battery -1% at each waypoint arrival.
+  - On START: immediate heartbeat PUT (isMoving=true).
+  - On STOP: immediate PUT (isMoving=false, Heading="stopped").
+  - On final waypoint: PUT (isMoving=false, Heading="idle").
+  - Prints full JSON on EVERY PUT.
 """
 
 import asyncio
@@ -34,7 +47,6 @@ def iso_now():
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 def step_length_feet(a, b):
-    """Feet distance from grid point a->{r,c} to b->{r,c} using axis scales."""
     dr = abs(b["r"] - a["r"])
     dc = abs(b["c"] - a["c"])
     if dr == 0.0 and dc == 0.0:
@@ -45,7 +57,6 @@ def step_length_feet(a, b):
     return diag * DIAG_SCALE + rem_r * Y_SCALE + rem_c * X_SCALE
 
 def grid_to_xy_feet(r, c):
-    """Convert grid (r,c) to world coordinates (feet)."""
     return {"x": c * X_SCALE, "y": r * Y_SCALE}
 
 # -------------------------------------------------------------
@@ -61,22 +72,42 @@ class Simulator:
         self.distance_traveled_ft = 0.0
         self._last_path_hash = None
 
-    # ---------- HTTP ----------
+    # ---------- /directions helper ----------
+    @staticmethod
+    def _normalize_dir_value(val: str) -> str:
+        if not isinstance(val, str):
+            return "STOP"
+        return val.strip().upper()
+
     async def get_directions(self, session) -> str:
+        """Read /directions as JSON or raw text. Accept keys 'directions' or 'command'."""
         try:
             async with session.get(HTTP_DIR_URL) as r:
                 r.raise_for_status()
-                text = await r.text()
-                if text.strip().startswith("{"):
-                    data = await r.json()
-                    return str(data.get("directions", "STOP")).strip().upper()
-                return text.strip().upper()
+                raw = await r.text()
         except Exception as e:
             print(f"[{iso_now()}] directions fetch failed: {e}")
             return "STOP"
 
+        raw_stripped = raw.strip()
+
+        # Try JSON first
+        if raw_stripped.startswith("{"):
+            try:
+                data = json.loads(raw_stripped)
+                # Prefer 'directions', but accept 'command'
+                if isinstance(data, dict):
+                    if "directions" in data:
+                        return self._normalize_dir_value(data["directions"])
+                    if "command" in data:
+                        return self._normalize_dir_value(data["command"])
+            except Exception:
+                pass  # fall through to raw text
+
+        # Raw text fallback ("START"/"STOP")
+        return self._normalize_dir_value(raw_stripped)
+
     async def load_path_if_changed(self, session):
-        """Reload path only if JSON content changed."""
         try:
             async with session.get(HTTP_PATH_URL) as r:
                 r.raise_for_status()
@@ -87,7 +118,7 @@ class Simulator:
 
         new_hash = hashlib.sha256(raw.encode("utf-8")).hexdigest()
         if new_hash == self._last_path_hash:
-            return  # unchanged
+            return
 
         try:
             obj = json.loads(raw)
@@ -102,9 +133,8 @@ class Simulator:
         self.next_idx = 0
         print(f"[{iso_now()}] Loaded path with {len(self.path)} waypoints (changed).")
 
-    # ---------- Distance ----------
-    def distance_remaining_ft(self) -> float:
-        """Feet from current position to the end of path."""
+    # ---------- Distances ----------
+    def distance_remaining_ft(self):
         if not self.path or self.next_idx >= len(self.path):
             return 0.0
         total = step_length_feet(self.curr, self.path[self.next_idx])
@@ -113,7 +143,7 @@ class Simulator:
         return total
 
     # ---------- Status PUT ----------
-    async def put_status(self, session, *, waypoint_number_1based: int | None, is_moving: bool):
+    async def put_status(self, session, *, waypoint_number_1based=None, is_moving=False, note=None):
         if not is_moving:
             heading = "stopped" if self.next_idx < len(self.path) else "idle"
         else:
@@ -140,6 +170,8 @@ class Simulator:
             "distanceTraveled_ft": round(self.distance_traveled_ft, 4),
             "distanceRemaining_ft": round(self.distance_remaining_ft(), 4),
         }
+        if note:
+            payload["debug_note"] = note
 
         print(f"[{iso_now()}] PUT /current-values payload:\n{json.dumps(payload, indent=2, sort_keys=True)}")
         async with session.put(HTTP_STATUS_URL, json=payload) as r:
@@ -152,27 +184,30 @@ class Simulator:
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
             await self.load_path_if_changed(session)
 
-            # Wait for explicit START before doing anything
-            print(f"[{iso_now()}] Waiting for START command...")
+            # Wait for explicit START AND a non-empty path
+            print(f"[{iso_now()}] Waiting for START and a non-empty /grid/path...")
             while True:
-                state = (await self.get_directions(session)).upper()
-                if state == "START":
+                dir_value = (await self.get_directions(session))
+                print(f"[{iso_now()}] /directions -> {dir_value}")
+                await self.load_path_if_changed(session)
+                has_path = bool(self.path)
+                if dir_value == "START" and has_path:
                     self.running = True
                     self.prev_running = True
-                    print(f"[{iso_now()}] START command received — beginning movement.")
+                    first_target = self.path[0]
+                    print(f"[{iso_now()}] START received with {len(self.path)} waypoints. First target: r={int(first_target['r'])}, c={int(first_target['c'])}")
+                    await self.put_status(session, waypoint_number_1based=None, is_moving=True, note="START received; beginning movement")
                     break
-                await asyncio.sleep(1)
-
-            # Emit initial status
-            await self.put_status(session, waypoint_number_1based=None, is_moving=self.running)
+                elif dir_value == "START" and not has_path:
+                    print(f"[{iso_now()}] START received, but path is empty — still waiting for /grid/path ...")
+                await asyncio.sleep(1.0)
 
             while True:
                 self.running = (await self.get_directions(session)) == "START"
 
-                # Handle STOP events
                 if self.prev_running and not self.running:
                     print(f"[{iso_now()}] STOP received — pausing movement.")
-                    await self.put_status(session, waypoint_number_1based=None, is_moving=False)
+                    await self.put_status(session, waypoint_number_1based=None, is_moving=False, note="STOP received")
 
                 self.prev_running = self.running
                 await self.load_path_if_changed(session)
@@ -187,7 +222,6 @@ class Simulator:
                 step_ft = SPEED_FTPS * POLL_DT
 
                 if remaining_ft <= 1e-9 or step_ft >= remaining_ft:
-                    # Arrive at waypoint
                     moved_ft = remaining_ft
                     self.curr = {"r": target["r"], "c": target["c"]}
                     self.distance_traveled_ft += moved_ft
@@ -197,11 +231,11 @@ class Simulator:
                     self.next_idx += 1
                     still_has_next = self.next_idx < len(self.path)
                     is_moving_now = self.running and still_has_next
-                    await self.put_status(session, waypoint_number_1based=seq_num, is_moving=is_moving_now)
+                    await self.put_status(session, waypoint_number_1based=seq_num, is_moving=is_moving_now,
+                                          note=f"Reached waypoint {seq_num}")
                     if not still_has_next:
                         print(f"[{iso_now()}] Route complete — no more waypoints.")
                 else:
-                    # Partial progress
                     ratio = step_ft / remaining_ft
                     self.curr = {
                         "r": prev["r"] + (target["r"] - prev["r"]) * ratio,
@@ -210,7 +244,6 @@ class Simulator:
                     moved_ft = step_ft
                     self.distance_traveled_ft += moved_ft
                     self.cable_remaining_ft = max(self.cable_remaining_ft - moved_ft, 0.0)
-                    # (Optional) mid-move PUT could go here
 
                 await asyncio.sleep(POLL_DT)
 

@@ -1,6 +1,6 @@
 import React from "react";
 
-const PathControls = ({
+  const PathControls = ({
   mode,
   setMode,
   path,
@@ -11,6 +11,7 @@ const PathControls = ({
   hasUnsavedObstacleChanges,
   onExportPath,
   onClearPath,
+  onImportObstacles,
   onExportObstacles,
   onClearObstacles,
   onRevertObstacles,
@@ -75,13 +76,13 @@ const PathControls = ({
           onClick={() => setMode("path")}
           style={modeButtonStyle(mode === "path")}
         >
-          ◉ EDIT PATH
+          ◉ PATH MODE
         </button>
         <button
           onClick={() => setMode("obstacle")}
           style={modeButtonStyle(mode === "obstacle")}
         >
-          ▲ EDIT OBSTACLES
+          ▲ OBSTACLE MODE
         </button>
       </div>
 
@@ -186,6 +187,12 @@ const PathControls = ({
           flexWrap: "wrap",
           alignItems: "center"
         }}>
+          <button
+            onClick={onImportObstacles}
+            style={actionButtonStyle(true, "#00ff9f", "rgba(0, 255, 159, 0.2)")}
+          >
+            ⬆ IMPORT OBSTACLES
+          </button>
           <button
             onClick={onExportObstacles}
             disabled={!hasUnsavedObstacleChanges}

@@ -12,6 +12,7 @@ const ClickToPath = ({
   messageBoxRef,
   mode,
   setMode,
+  importObstaclesRef, // ADD THIS LINE
   exportObstaclesRef,
   clearObstaclesRef,
   revertObstaclesRef,
@@ -43,13 +44,11 @@ const ClickToPath = ({
   
   const transformContext = useTransformContext();
   const scale = transformContext?.state?.scale ?? 1;
-
   const PATH_ENDPOINT = "http://localhost:8765/grid/path";
   const WAYPOINT_ENDPOINT = "http://localhost:8765/waypoints";
   
   // CONFIGURATION: Real-world size of one grid cell
   const GRID_CELL_SIZE_FEET = 2;
-
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -61,35 +60,29 @@ const ClickToPath = ({
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
   }, []);
-
   // Calculate Euclidean distance between two points in grid coordinates
   const calculateDistance = (point1, point2) => {
     const dx = point2.x - point1.x;
     const dy = point2.y - point1.y;
     return Math.sqrt(dx * dx + dy * dy);
   };
-
   // Calculate total path length in grid units and real-world units
   const calculatePathLength = () => {
     if (path.length < 2) {
       return { gridUnits: 0, feet: 0, meters: 0 };
     }
-
     let totalDistance = 0;
     for (let i = 0; i < path.length - 1; i++) {
       totalDistance += calculateDistance(path[i], path[i + 1]);
     }
-
     const distanceFeet = totalDistance * GRID_CELL_SIZE_FEET;
     const distanceMeters = distanceFeet * 0.3048;
-
     return {
       gridUnits: totalDistance,
       feet: distanceFeet,
       meters: distanceMeters
     };
   };
-
   // Export path to server
   const exportPath = async () => {
     if (path.length === 0) {
@@ -98,9 +91,7 @@ const ClickToPath = ({
       }
       return;
     }
-
     const pathLength = calculatePathLength();
-
     const pathData = path.map((point, index) => {
       if (index === 0) {
         return { r: point.y, c: point.x, label: "START" };
@@ -109,7 +100,6 @@ const ClickToPath = ({
       }
       return { r: point.y, c: point.x, label: "WAYPOINT" };
     });
-
     try {
       const response = await fetch(WAYPOINT_ENDPOINT, {
         method: "PUT",
@@ -139,7 +129,6 @@ const ClickToPath = ({
       }
     }
   };
-
   // Clear current path
   const clearPath = () => {
     setPath([]);
@@ -147,20 +136,17 @@ const ClickToPath = ({
       messageBoxRef.current.addMessage('info', 'Path cleared');
     }
   };
-
   // Expose path functions via refs
   useEffect(() => {
     if (exportPathRef) {
       exportPathRef.current = exportPath;
     }
   }, [path, exportPathRef]);
-
   useEffect(() => {
     if (clearPathRef) {
       clearPathRef.current = clearPath;
     }
   }, [clearPathRef]);
-
   // Delete a specific point
   const deletePoint = (index) => {
     const deletedPoint = path[index];
@@ -169,7 +155,6 @@ const ClickToPath = ({
       messageBoxRef.current.addMessage('info', `Waypoint removed at (${deletedPoint.x}, ${deletedPoint.y})`);
     }
   };
-
   // Handle mouse down on path point (start drag)
   const handlePointMouseDown = (e, index) => {
     if (mode !== "path") return;
@@ -177,18 +162,15 @@ const ClickToPath = ({
     setDraggedIndex(index);
     setIsDragging(true);
   };
-
   // Handle mouse move (dragging)
   const handleMouseMove = (e) => {
     if (!isDragging || draggedIndex === null || mode !== "path" || !gridBounds) return;
-
     const rect = containerRef.current.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
     
     const px = (clickX / rect.width) * imgDimensions.width;
     const py = (clickY / rect.height) * imgDimensions.height;
-
     if (
       px < gridBounds.minPX || 
       px > gridBounds.maxPX || 
@@ -209,7 +191,6 @@ const ClickToPath = ({
     };
     setPath(newPath);
   };
-
   // Handle mouse up (end drag)
   const handleMouseUp = () => {
     if (isDragging && draggedIndex !== null) {
@@ -226,7 +207,6 @@ const ClickToPath = ({
     
     setDragPosition(null);
   };
-
   useEffect(() => {
     if (isDragging) {
       const moveHandler = (e) => handleMouseMove(e);
@@ -240,7 +220,6 @@ const ClickToPath = ({
       };
     }
   }, [isDragging, draggedIndex, gridBounds, imgDimensions, dragPosition]);
-
   const handleClick = (e) => {
     if (mode !== "path" || isDragging) return;
     
@@ -252,7 +231,6 @@ const ClickToPath = ({
     
     const px = (clickX / rect.width) * imgDimensions.width;
     const py = (clickY / rect.height) * imgDimensions.height;
-
     if (
       px < gridBounds.minPX || 
       px > gridBounds.maxPX || 
@@ -279,7 +257,6 @@ const ClickToPath = ({
       y: Math.round(yCoord)
     }]);
   };
-
   const graphToPixel = (dot) => {
     const { width, height } = size;
     
@@ -294,7 +271,6 @@ const ClickToPath = ({
     const py = ((imgDimensions.height - imgY) / imgDimensions.height) * height;
     return { px, py };
   };
-
   // Calculate position based on distance traveled (in feet)
   const getPositionFromDistance = () => {
     if (path.length === 0) return { x: 0, y: 0, index: 0 };
@@ -340,10 +316,8 @@ const ClickToPath = ({
     console.log('At end of path');
     return { ...path[path.length - 1], index: path.length - 1 };
   };
-
   const currentDot = getPositionFromDistance();
   const { px, py } = graphToPixel(currentDot);
-
   let completed = [];
   let remaining = [];
   if (path.length > 1) {
@@ -351,7 +325,6 @@ const ClickToPath = ({
     completed.push({ x: currentDot.x, y: currentDot.y });
     remaining = [{ x: currentDot.x, y: currentDot.y }, ...path.slice(currentDot.index + 1)];
   }
-
   return (
     <div
       style={{
@@ -377,6 +350,7 @@ const ClickToPath = ({
           setImgDimensions={setImgDimensions} 
           image={image}
           messageBoxRef={messageBoxRef}
+          onImportObstacles={importObstaclesRef}
           onExportObstacles={exportObstaclesRef}
           onClearObstacles={clearObstaclesRef}
           onRevertObstacles={revertObstaclesRef}

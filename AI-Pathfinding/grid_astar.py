@@ -22,9 +22,9 @@ import requests
 # -------------------------
 # API endpoints
 # -------------------------
-OBSTACLES_URL = "http://localhost:8765/obstacles"
+OBSTACLES_URL = "http://localhost:8765/grid/obstacles"
 WAYPOINTS_URL = "http://localhost:8765/waypoints"
-POST_PATH_URL = "http://localhost:8765/path"
+POST_PATH_URL = "http://localhost:8765/grid/path"
 
 # -------------------------
 # Cable + per-step distances (feet)

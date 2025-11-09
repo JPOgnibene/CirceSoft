@@ -32,6 +32,11 @@ const ClickToPath = ({
   const ws = useWebSocket();
   const [distanceTraveled, setDistanceTraveled] = useState(0);
   const [isMoving, setIsMoving] = useState(false);
+
+  // Animation variables
+  const [animatedDistance, setAnimatedDistance] = useState(0);
+  const animationFrameRef = useRef(null);
+  const lastUpdateTimeRef = useRef(Date.now());
   
   // Update local state when WebSocket values change
   useEffect(() => {
@@ -41,6 +46,39 @@ const ClickToPath = ({
       console.log('ClickToPath - Distance updated:', ws.distanceTraveled, 'Moving:', ws.isMoving);
     }
   }, [ws?.distanceTraveled, ws?.isMoving]);
+
+  // Animation loop for smooth movement
+  useEffect(() => {
+    const animate = () => {
+      const now = Date.now();
+      const deltaTime = (now - lastUpdateTimeRef.current) / 1000;
+      lastUpdateTimeRef.current = now;
+      
+      setAnimatedDistance(prev => {
+        const diff = distanceTraveled - prev;
+        
+        if (Math.abs(diff) < 0.01) {
+          return distanceTraveled;
+        }
+        
+        const interpolationSpeed = Math.min(5, Math.abs(diff) * 2);
+        const step = diff * interpolationSpeed * deltaTime;
+        
+        return prev + step;
+      });
+      
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+    
+    animationFrameRef.current = requestAnimationFrame(animate);
+    
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [distanceTraveled]);
+
   
   const transformContext = useTransformContext();
   const scale = transformContext?.state?.scale ?? 1;
@@ -292,7 +330,7 @@ const ClickToPath = ({
       cumulativeDistance += segmentLength;
     }
     
-    const clampedDistance = Math.min(Math.max(0, distanceTraveled), cumulativeDistance);
+    const clampedDistance = Math.min(Math.max(0, animatedDistance), cumulativeDistance);
     
     console.log('getPositionFromDistance - Distance:', distanceTraveled, 'Clamped:', clampedDistance, 'Total:', cumulativeDistance);
     
@@ -486,6 +524,7 @@ const ClickToPath = ({
             height: 32 * scale,
             pointerEvents: "none",
             filter: isMoving ? "none" : "grayscale(0.5) opacity(0.7)",
+            transition: "filter 0.3s ease-in-out",
           }}
         />
       </div>

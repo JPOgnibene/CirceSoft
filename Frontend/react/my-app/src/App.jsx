@@ -25,6 +25,7 @@ function AppContent({ messageBoxRef }) {
   const [hasUnsavedObstacleChanges, setHasUnsavedObstacleChanges] = useState(false);
   
   // Refs for obstacle functions
+  const importObstaclesRef = useRef(null); // ADD THIS LINE
   const exportObstaclesRef = useRef(null);
   const clearObstaclesRef = useRef(null);
   const revertObstaclesRef = useRef(null);
@@ -76,6 +77,13 @@ function AppContent({ messageBoxRef }) {
   const handleClearPath = () => {
     if (clearPathRef.current) {
       clearPathRef.current();
+    }
+  };
+  
+  // ADD THIS HANDLER
+  const handleImportObstacles = () => {
+    if (importObstaclesRef.current) {
+      importObstaclesRef.current();
     }
   };
   
@@ -158,6 +166,7 @@ function AppContent({ messageBoxRef }) {
             hasUnsavedObstacleChanges={hasUnsavedObstacleChanges}
             onExportPath={handleExportPath}
             onClearPath={handleClearPath}
+            onImportObstacles={handleImportObstacles}  // ADD THIS LINE
             onExportObstacles={handleExportObstacles}
             onClearObstacles={handleClearObstacles}
             onRevertObstacles={handleRevertObstacles}
@@ -171,6 +180,7 @@ function AppContent({ messageBoxRef }) {
             messageBoxRef={messageBoxRef}
             mode={mode}
             setMode={setMode}
+            importObstaclesRef={importObstaclesRef}  // ADD THIS LINE
             exportObstaclesRef={exportObstaclesRef}
             clearObstaclesRef={clearObstaclesRef}
             revertObstaclesRef={revertObstaclesRef}

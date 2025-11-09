@@ -8,6 +8,7 @@ export default function MapView({
   messageBoxRef,
   mode,
   setMode,
+  importObstaclesRef,
   exportObstaclesRef,
   clearObstaclesRef,
   revertObstaclesRef,
@@ -87,6 +88,7 @@ export default function MapView({
                 messageBoxRef={messageBoxRef}
                 mode={mode}
                 setMode={setMode}
+                importObstaclesRef={importObstaclesRef}
                 exportObstaclesRef={exportObstaclesRef}
                 clearObstaclesRef={clearObstaclesRef}
                 revertObstaclesRef={revertObstaclesRef}

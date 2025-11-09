@@ -7,6 +7,7 @@ const GridMap = ({
   image, 
   setGridBounds, 
   messageBoxRef,
+  onImportObstacles,
   onExportObstacles,
   onClearObstacles,
   onRevertObstacles,
@@ -14,8 +15,8 @@ const GridMap = ({
   onUnsavedChangesChange,
 }) => {
   const [gridData, setGridData] = useState([]);
-  const [obstacles, setObstacles] = useState([]);
-  const [unsavedObstacles, setUnsavedObstacles] = useState([]); // Track local changes
+  const [obstacles, setObstacles] = useState([]); // Last saved/imported state
+  const [unsavedObstacles, setUnsavedObstacles] = useState([]); // Current working state
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isDraggingObstacle, setIsDraggingObstacle] = useState(false);
   const [lastObstaclePoint, setLastObstaclePoint] = useState(null);
@@ -41,6 +42,7 @@ const GridMap = ({
     }
   }, [gridData]);
 
+  // Fetch grid data on startup
   useEffect(() => {
     const fetchGrid = async () => {
       try {
@@ -63,24 +65,19 @@ const GridMap = ({
     fetchGrid();
   }, []);
 
-  useEffect(() => {
-    const fetchObstacles = async () => {
-      try {
-        const response = await fetch(OBSTACLE_JSON_ENDPOINT);
-        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
-        const json = await response.json();
-        // Handle both {data: [...]} or direct array format
-        const obstaclesData = json.data || json || [];
-        setObstacles(obstaclesData);
-        setUnsavedObstacles(obstaclesData); // Initialize unsaved with current obstacles
-      } catch (error) {
-        console.error("Failed to fetch obstacle data:", error);
-      }
-    };
-    fetchObstacles();
-  }, []);
+  // DO NOT fetch obstacles automatically on startup anymore
+  // Obstacles will only be loaded when user clicks "Import Obstacles"
 
-  const isObstacle = (r, c) => unsavedObstacles.some((obs) => obs.r === r && obs.c === c);
+  const isObstacle = (r, c) => {
+    // Check multiple possible property names for flexibility
+    const found = unsavedObstacles.some((obs) => {
+      // Try different possible property names
+      const obsR = obs.r !== undefined ? obs.r : obs.row;
+      const obsC = obs.c !== undefined ? obs.c : obs.col;
+      return obsR === r && obsC === c;
+    });
+    return found;
+  };
 
   // Get the pixel coordinates for a grid point
   const getGridPointCoords = (r, c) => {
@@ -197,6 +194,56 @@ const GridMap = ({
     setHasUnsavedChanges(true);
   };
 
+  // Import obstacles from server
+  const importObstacles = async () => {
+    console.log("=== IMPORT OBSTACLES STARTED ===");
+    console.log("Fetching from:", OBSTACLE_JSON_ENDPOINT);
+    try {
+      const response = await fetch(OBSTACLE_JSON_ENDPOINT);
+      console.log("Response status:", response.status);
+      
+      if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+      
+      const json = await response.json();
+      console.log("Raw JSON response:", json);
+      
+      // Handle both {data: [...]} or direct array format
+      let obstaclesData = json.data || json || [];
+      
+      // Normalize the data format to ensure {r, c} properties
+      obstaclesData = obstaclesData.map(obs => ({
+        r: obs.r !== undefined ? obs.r : obs.row,
+        c: obs.c !== undefined ? obs.c : obs.col
+      }));
+      
+      console.log("Normalized obstacles data:", obstaclesData);
+      console.log("Number of obstacles:", obstaclesData.length);
+      console.log("First obstacle (if any):", obstaclesData[0]);
+      
+      setObstacles(obstaclesData);
+      setUnsavedObstacles(obstaclesData);
+      setHasUnsavedChanges(false);
+      
+      console.log("State updated!");
+      console.log("obstacles state:", obstaclesData);
+      console.log("unsavedObstacles state:", obstaclesData);
+      console.log("=== IMPORT OBSTACLES COMPLETED ===");
+      
+      if (messageBoxRef?.current) {
+        messageBoxRef.current.addMessage(
+          'success', 
+          `Obstacles imported: ${obstaclesData.length} total obstacles`
+        );
+      }
+    } catch (error) {
+      console.error("=== IMPORT OBSTACLES FAILED ===");
+      console.error("Error:", error);
+      if (messageBoxRef?.current) {
+        messageBoxRef.current.addMessage('error', `Failed to import obstacles: ${error.message}`);
+      }
+    }
+  };
+
   // Export obstacles to server
   const exportObstacles = async () => {
     try {
@@ -249,6 +296,13 @@ const GridMap = ({
     }
   };
 
+  // Wire up the callback refs
+  useEffect(() => {
+    if (onImportObstacles) {
+      onImportObstacles.current = importObstacles;
+    }
+  }, [onImportObstacles]);
+
   useEffect(() => {
     if (onExportObstacles) {
       onExportObstacles.current = exportObstacles;
@@ -267,13 +321,14 @@ const GridMap = ({
     }
   }, [obstacles, unsavedObstacles, hasUnsavedChanges]);
 
-  // ADD THESE TWO NEW HOOKS RIGHT HERE:
+  // Update obstacle count
   useEffect(() => {
     if (onObstacleCountChange) {
       onObstacleCountChange(unsavedObstacles.length);
     }
   }, [unsavedObstacles.length, onObstacleCountChange]);
 
+  // Update unsaved changes status
   useEffect(() => {
     if (onUnsavedChangesChange) {
       onUnsavedChangesChange(hasUnsavedChanges);

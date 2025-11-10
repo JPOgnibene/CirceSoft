@@ -50,7 +50,11 @@ function AppContent({ messageBoxRef }) {
   const calculateDistance = (point1, point2) => {
     const dx = point2.x - point1.x;
     const dy = point2.y - point1.y;
-    return Math.sqrt(dx * dx + dy * dy);
+    const dx_feet = dx * 7.5; // CELL_WIDTH_FT
+    const dy_feet = dy * 5.16; // CELL_HEIGHT_FT
+    console.log("NEW CALCULATIONS: ", dx_feet, dy_feet);
+    console.log("REUTURN VAL: ", Math.sqrt(dx_feet * dx_feet + dy_feet * dy_feet));
+    return Math.sqrt(dx_feet * dx_feet + dy_feet * dy_feet);
   };
   
   const calculatePathLength = () => {
@@ -61,7 +65,7 @@ function AppContent({ messageBoxRef }) {
     for (let i = 0; i < path.length - 1; i++) {
       totalDistance += calculateDistance(path[i], path[i + 1]);
     }
-    const distanceFeet = totalDistance * GRID_CELL_SIZE_FEET;
+    const distanceFeet = totalDistance;
     const distanceMeters = distanceFeet * 0.3048;
     return { gridUnits: totalDistance, feet: distanceFeet, meters: distanceMeters };
   };

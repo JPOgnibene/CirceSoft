@@ -146,18 +146,13 @@ function AppContent({ messageBoxRef }) {
           <Progress/>
         </div>
         <div className="spacer"></div>
-        <label className="switch">
-          <input type="checkbox" id="websocket_on" />
-        </label>
-        <label className="switch">
-          <input type="checkbox" id="offpath" />
-        </label>
-        <div className="icon">
+        {/* <div className="icon">
           <OnPathIcon messageBoxRef={messageBoxRef} />
-        </div>
-        <div>
+        </div> */}
+        {/* <div>
           <SendToCirceBot path={path} />
-        </div>
+        </div> */}
+        <img className="logo" src="/contents/images/devcomlogo.png" alt="Devcom" />
       </header>
       
       {/* Main Content Area */}

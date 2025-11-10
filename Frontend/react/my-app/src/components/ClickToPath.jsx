@@ -87,6 +87,8 @@ const ClickToPath = ({
   
   // CONFIGURATION: Real-world size of one grid cell
   const GRID_CELL_SIZE_FEET = 2;
+  const CELL_WIDTH_FT = 7.5;
+  const CELL_HEIGHT_FT = 5.16;
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -102,7 +104,9 @@ const ClickToPath = ({
   const calculateDistance = (point1, point2) => {
     const dx = point2.x - point1.x;
     const dy = point2.y - point1.y;
-    return Math.sqrt(dx * dx + dy * dy);
+    const dx_feet = dx * CELL_WIDTH_FT;
+    const dy_feet = dy * CELL_HEIGHT_FT;
+    return Math.sqrt(dx_feet * dx_feet + dy_feet * dy_feet);
   };
   // Calculate total path length in grid units and real-world units
   const calculatePathLength = () => {
@@ -113,7 +117,9 @@ const ClickToPath = ({
     for (let i = 0; i < path.length - 1; i++) {
       totalDistance += calculateDistance(path[i], path[i + 1]);
     }
-    const distanceFeet = totalDistance * GRID_CELL_SIZE_FEET;
+    //const distanceFeet = totalDistance * GRID_CELL_SIZE_FEET;
+    const distanceFeet = totalDistance;
+    console.log("calculatePathLength - Total Distance (grid units):", totalDistance, "Feet:", distanceFeet);
     const distanceMeters = distanceFeet * 0.3048;
     return {
       gridUnits: totalDistance,
@@ -318,7 +324,7 @@ const ClickToPath = ({
     let cumulativeDistance = 0;
     
     for (let i = 0; i < path.length - 1; i++) {
-      const segmentLength = calculateDistance(path[i], path[i + 1]) * GRID_CELL_SIZE_FEET;
+      const segmentLength = calculateDistance(path[i], path[i + 1]);
       segmentDistances.push({
         start: cumulativeDistance,
         end: cumulativeDistance + segmentLength,
@@ -332,7 +338,7 @@ const ClickToPath = ({
     
     const clampedDistance = Math.min(Math.max(0, animatedDistance), cumulativeDistance);
     
-    console.log('getPositionFromDistance - Distance:', distanceTraveled, 'Clamped:', clampedDistance, 'Total:', cumulativeDistance);
+    //console.log('getPositionFromDistance - Distance:', distanceTraveled, 'Clamped:', clampedDistance, 'Total:', cumulativeDistance);
     
     for (let i = 0; i < segmentDistances.length; i++) {
       const segment = segmentDistances[i];
@@ -346,7 +352,7 @@ const ClickToPath = ({
           index: segment.index,
         };
         
-        console.log('Position calculated:', position, 'Segment:', i, 't:', t);
+        //console.log('Position calculated:', position, 'Segment:', i, 't:', t);
         return position;
       }
     }

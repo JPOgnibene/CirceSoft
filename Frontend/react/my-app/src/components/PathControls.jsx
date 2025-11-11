@@ -4,6 +4,7 @@ const PathControls = ({
   mode,
   setMode,
   path,
+  setPath, // ADD THIS PROP
   pathLength,
   distanceTraveled,
   isMoving,
@@ -15,7 +16,46 @@ const PathControls = ({
   onExportObstacles,
   onClearObstacles,
   onRevertObstacles,
+  messageBoxRef, // ADD THIS PROP
 }) => {
+  const PATH_JSON_ENDPOINT = "http://localhost:8765/grid/path";
+
+  const handleImportPath = async () => {
+    try {
+      const response = await fetch(PATH_JSON_ENDPOINT);
+      if (!response.ok) {
+        throw new Error(`HTTP error: ${response.status}`);
+      }
+      
+      const json = await response.json();
+      const pathData = json.data || json || [];
+      
+      if (pathData.length === 0) {
+        if (messageBoxRef?.current) {
+          messageBoxRef.current.addMessage('info', 'No path data found to import');
+        }
+        return;
+      }
+      
+      const convertedPath = pathData.map(point => ({
+        x: point.c || 0,
+        y: point.r || 0
+      }));
+      
+      setPath(convertedPath);
+      
+      if (messageBoxRef?.current) {
+        messageBoxRef.current.addMessage('success', `Path imported: ${convertedPath.length} waypoints`);
+      }
+      
+    } catch (error) {
+      console.error("Failed to import path:", error);
+      if (messageBoxRef?.current) {
+        messageBoxRef.current.addMessage('error', 'Failed to import path');
+      }
+    }
+  };
+
   const buttonBaseStyle = {
     padding: "10px 20px",
     border: "1px solid rgba(0, 255, 159, 0.2)",
@@ -51,7 +91,6 @@ const PathControls = ({
   });
 
   const toggleMode = (selectedMode) => {
-    // Clicking same button again -> deselects mode
     if (mode === selectedMode) {
       setMode(null);
     } else {
@@ -71,7 +110,7 @@ const PathControls = ({
           backgroundColor: "rgba(15, 20, 30, 0.9)",
           border: "1px solid rgba(107, 114, 128, 0.3)",
           borderRadius: "2px",
-          width: "100%", // ✅ fills full width like others
+          width: "100%",
         }}
       >
         <button
@@ -96,10 +135,26 @@ const PathControls = ({
           transition:
             "max-height 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease",
           opacity: mode === "path" ? 1 : 0,
-          width: "100%", // ✅ match button width
+          width: "100%",
         }}
       >
-        {/* Button grid */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr",
+            gap: "12px",
+            marginBottom: "12px",
+            width: "100%",
+          }}
+        >
+          <button
+            onClick={handleImportPath}
+            style={actionButtonStyle(true, "#00ff9f", "rgba(0, 255, 159, 0.2)")}
+          >
+            ⬆ IMPORT PATH
+          </button>
+        </div>
+        {/* Button grid - NOW 3 BUTTONS */}
         <div
           style={{
             display: "grid",
@@ -109,6 +164,12 @@ const PathControls = ({
             width: "100%",
           }}
         >
+          {/* <button
+            onClick={handleImportPath}
+            style={actionButtonStyle(true, "#00ff9f", "rgba(0, 255, 159, 0.2)")}
+          >
+            ⬆ IMPORT PATH
+          </button> */}
           <button
             onClick={onExportPath}
             disabled={path.length === 0}
@@ -199,7 +260,7 @@ const PathControls = ({
           transition:
             "max-height 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease",
           opacity: mode === "obstacle" ? 1 : 0,
-          width: "100%", // ✅ match other buttons
+          width: "100%",
         }}
       >
         <div

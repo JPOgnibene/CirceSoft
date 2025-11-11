@@ -19,6 +19,7 @@ import {
 } from "./components/Icons";
 
 function AppContent({ messageBoxRef }) {
+  const [isBotRunning, setIsBotRunning] = useState(false);
   const [completionProgress, setValue] = useState(0);
   const [path, setPath] = useState([]);
   const [mode, setMode] = useState("path");
@@ -120,7 +121,7 @@ function AppContent({ messageBoxRef }) {
           <div className="clickIcon">
             <ImportPathIcon messageBoxRef={messageBoxRef} onPathImported={handlePathImported}/>
           </div>
-          <div className="clickIcon">
+          {/* <div className="clickIcon">
             <PlayButtonIcon messageBoxRef={messageBoxRef} />
           </div>
           <div className="clickIcon">
@@ -128,19 +129,19 @@ function AppContent({ messageBoxRef }) {
           </div>
           <div className="clickIcon">
             <WaypointIcon messageBoxRef={messageBoxRef} />
-          </div>
+          </div> */}
           {/* <div>
             <EmergencyStop messageBoxRef={messageBoxRef} />
           </div>
           <div>
             <StartCommand messageBoxRef={messageBoxRef} />
           </div> */}
-          <div>
+          {/* <div>
             <StartStopButton messageBoxRef={messageBoxRef} />
-          </div>
-          <div className="clickIcon">
+          </div> */}
+          {/* <div className="clickIcon">
             <TargetIcon messageBoxRef={messageBoxRef} />
-          </div>
+          </div> */}
           <div className="clickIcon">
             <IsMovingStatus messageBoxRef={messageBoxRef} />
           </div>
@@ -155,7 +156,8 @@ function AppContent({ messageBoxRef }) {
         {/* <div>
           <SendToCirceBot path={path} />
         </div> */}
-        <img className="logo" src="/contents/images/devcomlogo.png" alt="Devcom" />
+        <img className="logo2" src="/contents/images/devcomlogo2.png" alt="Devcom" />
+        <img className="logo1" src="/contents/images/devcomlogo.png" alt="Devcom" />
       </header>
       
       {/* Main Content Area */}
@@ -165,6 +167,7 @@ function AppContent({ messageBoxRef }) {
             mode={mode}
             setMode={setMode}
             path={path}
+            setPath={setPath}
             pathLength={pathLength}
             distanceTraveled={distanceTraveled}
             isMoving={isMoving}
@@ -176,6 +179,7 @@ function AppContent({ messageBoxRef }) {
             onExportObstacles={handleExportObstacles}
             onClearObstacles={handleClearObstacles}
             onRevertObstacles={handleRevertObstacles}
+            messageBoxRef={messageBoxRef}
           />
           <MessageWindow ref={messageBoxRef} />
         </div>
@@ -197,6 +201,18 @@ function AppContent({ messageBoxRef }) {
           />
           <div className="bottom-progress">
             <Progress distanceTraveled={distanceTraveled} pathLength={pathLength} />
+          </div>
+          <div style={{ display: "flex", marginTop: "8px" }}>
+            <div style={{ flex: isBotRunning ? "0 0 50%" : "1 1 100%", transition: "flex 0.3s ease" }}>
+              <StartStopButton 
+                messageBoxRef={messageBoxRef} 
+                onRunningChange={setIsBotRunning}
+              />
+            </div>
+            <IsMovingStatus 
+              messageBoxRef={messageBoxRef} 
+              isVisible={isBotRunning}
+            />
           </div>
         </div>
       </div>

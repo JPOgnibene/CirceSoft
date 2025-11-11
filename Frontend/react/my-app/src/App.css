@@ -7,95 +7,101 @@
   html, body {
     height: 100%;
     font-family: 'Courier New', monospace;
+    background-color: #1a1d23;
   }
   
   /* Header bar */
   .header {
     height: 80px;
-    /* Smooth left-to-right fade: gray → light gray (or any other color) */
     background: linear-gradient(
       to right,
-      #404040 80%,   /* main color for about 70% of the width */
-      #c0c0c0 100%   /* fade target color at the right edge */
+      #1a1d23 80%,
+      #cccccc 100%
     );
+    border-bottom: 1px solid rgba(0, 255, 159, 0.15);
     color: white;
     display: flex;
     align-items: center;
     padding: 0 20px;
   }
-
   
   /* Flex container for the two panes */
   .content {
     display: flex;
-    height: calc(100vh - 80px); /* full viewport height minus header height */
+    height: calc(100vh - 80px);
   }
   
-    /* Left window (message window) */
+  /* Left window (message window) */
   .message_window {
-  width: 30%;
-  border: 2px solid black;
-  background-color: #ecf0f1;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-/* Make sure MessageWindow component fills the width */
-.message_window > * {
-  width: 100%;
-}
-
-.messages {
-  flex: 1;
-  overflow-y: auto;
-  background: white;
-  border: 1px solid #ccc;
-  padding: 10px;
-  margin-top: 10px;
-  font-family: 'Courier New', monospace;
-  min-height: 0;
-  width: 100%; /* Explicitly set width */
-  box-sizing: border-box; /* Include padding in width calculation */
-}
+    width: 30%;
+    border-right: 1px solid rgba(0, 255, 159, 0.15);
+    background-color: #1f2229;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  
+  /* Make sure MessageWindow component fills the width */
+  .message_window > * {
+    width: 100%;
+  }
+  
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    background: #0f1015;
+    border: 1px solid rgba(0, 255, 159, 0.2);
+    border-radius: 2px;
+    padding: 10px;
+    margin-top: 10px;
+    font-family: 'Courier New', monospace;
+    min-height: 0;
+    width: 100%;
+    box-sizing: border-box;
+    color: #e0e0e0;
+  }
   
   .hazard {
-      padding: 5px;
-      margin-bottom: 5px;
-      border-left: 4px solid #333;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    border-left: 3px solid #333;
+    border-radius: 2px;
+    font-size: 0.85rem;
   }
   
   .hazard.info {
-      background-color: #dfe6e9;
-      border-color: #3498db;
+    background-color: rgba(52, 152, 219, 0.15);
+    border-color: #3498db;
+    color: #5dade2;
   }
   
   .hazard.warning {
-      background-color: #fff3cd;
-      border-color: #f1c40f;
+    background-color: rgba(241, 196, 15, 0.15);
+    border-color: #f1c40f;
+    color: #f4d03f;
   }
   
   .hazard.danger {
-      background-color: #f8d7da;
-      border-color: #e74c3c;
+    background-color: rgba(231, 76, 60, 0.15);
+    border-color: #e74c3c;
+    color: #ec7063;
   }
   
-    /* Right window (live feed display) */
-    .map_feed {
-      flex: 1; /* Takes the rest of the space */
-      border: 2px solid black;
-      background-color: #dfe6e9;
-      padding: 10px;
-    }
-
-  /*All the icons*/
+  /* Right window (live feed display) */
+  .map_feed {
+    flex: 1;
+    background-color: #1a1d23;
+    padding: 10px;
+  }
+  
+  /* All the icons */
   .icons {
     display: flex;
     align-items: center;
     gap: 20px;
   }
-
+  
   /* Non-clickable status icons */
   .clickIcon {
     height: 50px;
@@ -103,8 +109,13 @@
     display: flex;
     justify-content: center;
     cursor: pointer;
+    transition: transform 0.2s ease;
   }
-
+  
+  .clickIcon:hover {
+    transform: scale(1.1);
+  }
+  
   /* Clickable icons */
   .icon {
     height: 50px;
@@ -112,60 +123,60 @@
     display: flex;
     justify-content: center;
   }
-
-    .spacer {
-      flex-grow: 1; /* Pushes the right icon to the right */
-    }
   
-
-
-
-
-    .progress-container {
-      display:flex;
-      align-items: center;
-      gap: 10px;
-      margin-left:20px;
-    }
+  .spacer {
+    flex-grow: 1;
+  }
   
-    .progress-bar {
-      width: 200px;
-      height: 20px;
-      background-color: #eee;
-      border-radius: 10px;
-      overflow: hidden;
-      position: relative;
-    }
+  .progress-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: 20px;
+  }
   
-    .progress-fill {
-      height: 100%;
-      background-color: #4caf50;
-      width:0%;
-      transition: width 0.3 ease-in-out;
-      position: relative;
-    }
+  .progress-bar {
+    width: 200px;
+    height: 20px;
+    background-color: #eee;
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+  }
   
-    .slider {
-      width: 150px;
-    }
+  .progress-fill {
+    height: 100%;
+    background-color: #4caf50;
+    width: 0%;
+    transition: width 0.3s ease-in-out;
+    position: relative;
+  }
   
-    .progress-value {
-      position: absolute;
-      width: 100%;
-      text-align: center;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      font-size: 14px;
-      color: black;
-      font-weight: bold;
-      pointer-events: none;
-      z-index: 1;
-   }
-
-
-  .logo {
-      height: 120px;
-      width: auto;
-    }
+  .slider {
+    width: 150px;
+  }
   
+  .progress-value {
+    position: absolute;
+    width: 100%;
+    text-align: center;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 14px;
+    color: black;
+    font-weight: bold;
+    pointer-events: none;
+    z-index: 1;
+  }
+  
+  .logo1 {
+    height: 140px;
+    width: auto;
+  }
+  
+  .logo2 {
+    height: 60px;
+    width: auto;
+    margin-left: 16px;
+  }

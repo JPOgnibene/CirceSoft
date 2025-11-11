@@ -2,7 +2,7 @@ import React, { useState } from "react";
 
 const DIRECTIONS_API = "http://localhost:8765/directions";
 
-function StartStopButton({ messageBoxRef }) {
+function StartStopButton({ messageBoxRef, onRunningChange }) {
   const [isRunning, setIsRunning] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -14,20 +14,20 @@ function StartStopButton({ messageBoxRef }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ command }),
       });
-
       if (!response.ok) throw new Error(`Server error: ${response.status}`);
-
       const result = await response.json();
       console.log(`${command} command sent:`, result);
-
       if (messageBoxRef?.current) {
         messageBoxRef.current.addMessage(
           command === "START" ? "success" : "warning",
           `${command} command sent to the bot`
         );
       }
-
-      setIsRunning(command === "START");
+      const newRunningState = command === "START";
+      setIsRunning(newRunningState);
+      if (onRunningChange) {
+        onRunningChange(newRunningState);
+      }
     } catch (error) {
       console.error(`Error sending ${command}:`, error);
       if (messageBoxRef?.current) {
@@ -46,32 +46,27 @@ function StartStopButton({ messageBoxRef }) {
     sendCommand(isRunning ? "STOP" : "START");
   };
 
-  // Base styles matching PathControls buttons
-  const buttonBaseStyle = {
-    padding: "10px 20px",
-    border: "1px solid rgba(0, 255, 159, 0.2)",
+  const buttonStyle = {
+    width: "100%",
+    padding: "12px 20px",
+    border: isRunning 
+      ? "1px solid #ff4757" 
+      : "1px solid rgba(0, 255, 159, 0.3)",
     borderRadius: "2px",
     cursor: isLoading ? "not-allowed" : "pointer",
-    fontSize: "0.85rem",
-    fontWeight: "600",
-    letterSpacing: "0.5px",
+    fontSize: "0.9rem",
+    fontWeight: "700",
+    letterSpacing: "1px",
     textTransform: "uppercase",
-    transition: "all 0.15s ease",
+    transition: "all 0.3s ease",
     fontFamily: "'Courier New', monospace",
-    backgroundColor: "rgba(20, 25, 35, 0.8)",
-    position: "relative",
-    flex: 1,
-  };
-
-  // Active color themes
-  const startStyle = {
-    ...buttonBaseStyle,
-    backgroundColor: `${isRunning ? "rgba(255, 50, 50, 0.15)" : "rgba(0,255,159,0.1)"}`,
+    backgroundColor: isRunning 
+      ? "rgba(255, 71, 87, 0.15)" 
+      : "rgba(0, 255, 159, 0.15)",
     color: isRunning ? "#ff4757" : "#00ff9f",
-    borderColor: isRunning ? "#ff4757" : "#00ff9f",
     boxShadow: isRunning
-      ? "0 0 15px rgba(255, 71, 87, 0.3)"
-      : "0 0 15px rgba(0, 255, 159, 0.2)",
+      ? "0 0 20px rgba(255, 71, 87, 0.3)"
+      : "0 0 20px rgba(0, 255, 159, 0.3)",
     opacity: isLoading ? 0.6 : 1,
   };
 
@@ -79,14 +74,10 @@ function StartStopButton({ messageBoxRef }) {
     <button
       onClick={handleClick}
       disabled={isLoading}
-      style={startStyle}
+      style={buttonStyle}
       title={isRunning ? "Stop Bot" : "Start Bot"}
     >
-      {isLoading
-        ? "PROCESSING..."
-        : isRunning
-        ? "⏹ STOP BOT"
-        : "▶ START BOT"}
+      {isLoading ? "⏳ PROCESSING..." : isRunning ? "⏹ STOP BOT" : "▶ START BOT"}
     </button>
   );
 }

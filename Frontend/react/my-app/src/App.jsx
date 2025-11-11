@@ -5,7 +5,7 @@ import MapView from "./components/MapView";
 import Progress from "./components/Progress";
 import EmergencyStop from "./components/Stop";
 import StartCommand from "./components/Start";
-import SendToCirceBot from "./components/SendToCirceBot";
+import StartStopButton from './components/StartStop';
 import IsMovingStatus from "./components/BotMoving";
 import ImportPathIcon from './components/ImportPathIcon';
 import PathControls from './components/PathControls';
@@ -129,11 +129,14 @@ function AppContent({ messageBoxRef }) {
           <div className="clickIcon">
             <WaypointIcon messageBoxRef={messageBoxRef} />
           </div>
-          <div>
+          {/* <div>
             <EmergencyStop messageBoxRef={messageBoxRef} />
           </div>
           <div>
             <StartCommand messageBoxRef={messageBoxRef} />
+          </div> */}
+          <div>
+            <StartStopButton messageBoxRef={messageBoxRef} />
           </div>
           <div className="clickIcon">
             <TargetIcon messageBoxRef={messageBoxRef} />
@@ -142,9 +145,9 @@ function AppContent({ messageBoxRef }) {
             <IsMovingStatus messageBoxRef={messageBoxRef} />
           </div>
         </div>
-        <div className="progress-container">
+        {/* <div className="progress-container">
           <Progress/>
-        </div>
+        </div> */}
         <div className="spacer"></div>
         {/* <div className="icon">
           <OnPathIcon messageBoxRef={messageBoxRef} />
@@ -192,6 +195,9 @@ function AppContent({ messageBoxRef }) {
             exportPathRef={exportPathRef}
             clearPathRef={clearPathRef}
           />
+          <div className="bottom-progress">
+            <Progress distanceTraveled={distanceTraveled} pathLength={pathLength} />
+          </div>
         </div>
       </div>
     </div>

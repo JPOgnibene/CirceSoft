@@ -341,7 +341,7 @@ const GridMap = ({
         position: "relative",
         display: "inline-block",
         width: "100%",
-        maxWidth: "1049px",
+        // maxWidth: "1049px",
       }}
     >
       {image && (

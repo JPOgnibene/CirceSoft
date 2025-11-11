@@ -53,8 +53,8 @@ export default function MapView({
   return (
     <div
       style={{
-        width: `${fieldWidth}px`,
-        height: `${fieldHeight}px`,
+        width: "100%",
+
         overflow: "hidden",
         border: "none",
         margin: 0,
@@ -71,11 +71,14 @@ export default function MapView({
         doubleClick={{ disabled: true }}
       >
         {({ state }) => (
-          <TransformComponent>
+          <TransformComponent
+            wrapperStyle={{ width: "100%", height: "100%" }}
+            contentStyle={{ width: "100%", height: "100%" }}
+          >
             <div
               style={{
-                width: `${fieldWidth}px`,
-                height: `${fieldHeight}px`,
+                width: "100%",
+                // height: `${fieldHeight}px`,
                 position: "relative"
               }}
             >

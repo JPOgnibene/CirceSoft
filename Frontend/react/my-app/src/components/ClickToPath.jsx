@@ -373,12 +373,16 @@ const ClickToPath = ({
     <div
       style={{
         position: "relative",
-        width: `${imgDimensions.width}px`,
-        height: `${imgDimensions.height}px`,
+        width: "100%",
+        paddingBottom: `${(imgDimensions.height / imgDimensions.width) * 100}%`,  // Maintain aspect ratio
+        height: 0,
       }}
     >
       <div
         style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
           width: "100%",
           height: "100%",
         }}

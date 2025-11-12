@@ -1,377 +1,203 @@
 #!/usr/bin/env python3
 """
-grid_astar.py (headless, diagonals always enabled, watcher by default)
+Grid A* pathfinder (0,0 = bottom-left corner)
 
-A* shortest path with:
-- JSON inputs from API endpoints (no CSVs, no rendering):
-    GET http://localhost:8765/obstacles  -> [{"row": r, "col": c}, ...]
-    GET http://localhost:8765/waypoints  -> [{"row": r, "col": c, "type": "start|waypoint|end"}, ...]
-- Required waypoint chain: start -> waypoint1 -> ... -> end
-- Always uses 8-way (diagonal) movement for efficient routing
-- One-cell safety buffer (inflation) around obstacles (not persisted)
-- Cable-length limit, anisotropic step costs (ft): X=7.5, Y=5.16129, Diag=9.104334
-- Posts computed path JSON to: POST http://localhost:8765/path
-- Periodic watcher (default) polls endpoints and auto-recomputes on changes
-- Cooldown after compute (default 2s) to avoid rapid re-runs
+Reads:
+  GET http://localhost:8765/waypoints        -> {"data":[{"r":..,"c":..,"label":"START|WAYPOINT|END"}, ...]}
+  GET http://localhost:8765/grid/obstacles   -> list OR {"data":[{r,c}|{x,y}, ...]}
+
+Writes:
+  PUT http://localhost:8765/grid/path        -> bare JSON list [{"r":int,"c":int}, ...]
+
+Conventions:
+  • Hard-coded grid: 0 ≤ r < 31, 0 ≤ c < 48
+  • (0,0) = bottom-left corner
+  • r increases upward, c increases rightward
+  • 8-direction movement, feet-based costs
 """
 
-import argparse, sys, time, hashlib, json
-from typing import Dict, List, Optional, Set, Tuple
-import requests
+from __future__ import annotations
+import asyncio, json, math, hashlib, time
+from typing import Dict, Iterable, List, Optional, Tuple
+import aiohttp
 
-# -------------------------
-# API endpoints
-# -------------------------
-OBSTACLES_URL = "http://localhost:8765/obstacles"
+# ----------------- Endpoints -----------------
 WAYPOINTS_URL = "http://localhost:8765/waypoints"
-POST_PATH_URL = "http://localhost:8765/path"
+OBSTACLES_URL = "http://localhost:8765/grid/obstacles"
+PATH_PUT_URL  = "http://localhost:8765/grid/path"
 
-# -------------------------
-# Cable + per-step distances (feet)
-# -------------------------
-CABLE_MAX_FT = 300.0
-COST_X = 7.5
-COST_Y = 5.16129
-COST_DIAG = 9.104334  # (±1,±1) steps
+# ----------------- Grid bounds -----------------
+MAX_ROW = 31   # rows: 0..30 (bottom to top)
+MAX_COL = 48   # cols: 0..47 (left to right)
 
-Coord = Tuple[int, int]  # (x=col, y=row)
+# ----------------- Movement scales (feet) -----------------
+X_SCALE, Y_SCALE, DIAG_SCALE = 7.5, 5.16129, 9.104334
+MAX_CABLE_FT = 300.0
 
+# ----------------- Watcher -----------------
+POLL_INTERVAL_SEC, DEBOUNCE_MS, COOLDOWN_SEC = 2.0, 150, 2.0
 
-# -------------------------
-# Logging
-# -------------------------
-def log(msg: str) -> None:
-    print(msg, flush=True)
+# ----------------- Helpers -----------------
+def _unwrap_data(obj):
+    return obj["data"] if isinstance(obj, dict) and "data" in obj else obj
 
+def _pt_from_rc_or_xy(p)->Tuple[int,int]:
+    if not isinstance(p,dict):raise ValueError(f"Point not dict:{p}")
+    if "r" in p and "c" in p: return int(p["r"]),int(p["c"])
+    if "x" in p and "y" in p: return int(p["y"]),int(p["x"])
+    raise ValueError(f"Missing r/c or x/y:{p}")
 
-# -------------------------
-# Endpoint I/O
-# -------------------------
-def _xy_from_any(d: dict) -> Coord:
-    if "col" in d and "row" in d:
-        return (int(d["col"]), int(d["row"]))
-    if "x" in d and "y" in d:
-        return (int(d["x"]), int(d["y"]))
-    raise ValueError(f"Point missing row/col (or x/y): {d}")
+def _hash_text(s:str)->str: return hashlib.sha256(s.encode()).hexdigest()
 
+# ----------------- Coordinate transform -----------------
+def to_internal(r:int)->int:
+    """Convert user row (0=bottom) → internal row (0=top)."""
+    return (MAX_ROW - 1) - r
 
-def get_obstacles() -> List[Coord]:
-    r = requests.get(OBSTACLES_URL, timeout=5)
-    r.raise_for_status()
-    return [_xy_from_any(d) for d in r.json()]
+def from_internal(r:int)->int:
+    """Convert internal row back to user row."""
+    return (MAX_ROW - 1) - r
 
+# ----------------- Distance -----------------
+def segment_length_feet(a:Tuple[int,int],b:Tuple[int,int])->float:
+    ar,ac=a;br,bc=b;dr,dc=abs(br-ar),abs(bc-ac)
+    if dr==0 and dc==0:return 0.0
+    d=min(dr,dc)
+    return d*DIAG_SCALE+(dr-d)*Y_SCALE+(dc-d)*X_SCALE
 
-def get_waypoints() -> List[Tuple[Coord, str]]:
-    r = requests.get(WAYPOINTS_URL, timeout=5)
-    r.raise_for_status()
-    arr = r.json()
-    out: List[Tuple[Coord, str]] = []
-    for d in arr:
-        xy = _xy_from_any(d)
-        t = str(d.get("type", "waypoint")).lower()
-        if t not in {"start", "waypoint", "end"}:
-            t = "waypoint"
-        out.append((xy, t))
-    return out
+def polyline_feet(path:List[Tuple[int,int]])->float:
+    return sum(segment_length_feet(path[i],path[i+1]) for i in range(len(path)-1))
 
+# ----------------- Heuristic -----------------
+def h_feet(a,b)->float:
+    dx,dy=abs(a[1]-b[1]),abs(a[0]-b[0])
+    d=min(dx,dy);rem=max(dx,dy)-d
+    diag=min(DIAG_SCALE,X_SCALE+Y_SCALE)
+    straight=min(X_SCALE,Y_SCALE)
+    return d*diag+rem*straight
 
-def post_path_json(path: List[Coord], total_feet: float) -> None:
-    payload = [{"col": x, "row": y, "x": x, "y": y} for (x, y) in path]
-    cum = 0.0
-    if len(path) > 1:
-        payload[0]["cum_ft"] = 0.0
-        for i in range(1, len(path)):
-            cum += step_cost(path[i - 1], path[i])
-            payload[i]["cum_ft"] = round(cum, 6)
-    else:
-        for p in payload:
-            p["cum_ft"] = 0.0
-    body = {"path": payload, "total_feet": round(total_feet, 6)}
-    requests.post(POST_PATH_URL, json=body, timeout=5).raise_for_status()
+# ----------------- A* -----------------
+def neighbors_8(r:int,c:int):
+    for dr,dc in [(-1,0),(1,0),(0,-1),(0,1),(-1,-1),(-1,1),(1,-1),(1,1)]:
+        yield r+dr,c+dc
 
-
-# -------------------------
-# Geometry / Costs
-# -------------------------
-def in_bounds(p: Coord, width: int, height: int) -> bool:
-    x, y = p
-    return 0 <= x < width and 0 <= y < height
-
-
-def neighbors_8(x: int, y: int):
-    return [
-        (x - 1, y),
-        (x + 1, y),
-        (x, y - 1),
-        (x, y + 1),
-        (x - 1, y - 1),
-        (x - 1, y + 1),
-        (x + 1, y - 1),
-        (x + 1, y + 1),
-    ]
-
-
-def weighted_octile(a: Coord, b: Coord) -> float:
-    dx = abs(a[0] - b[0])
-    dy = abs(a[1] - b[1])
-    dmin, dmax = min(dx, dy), max(dx, dy)
-    return COST_DIAG * dmin + (dmax - dmin) * (COST_X if dx > dy else COST_Y)
-
-
-def step_cost(a: Coord, b: Coord) -> float:
-    ax, ay = a
-    bx, by = b
-    if ax != bx and ay != by:
-        return COST_DIAG
-    if ax != bx:
-        return COST_X
-    return COST_Y
-
-
-def path_length_feet(path: Optional[List[Coord]]) -> float:
-    if not path or len(path) < 2:
-        return 0.0 if path else float("inf")
-    total = 0.0
-    for u, v in zip(path, path[1:]):
-        total += step_cost(u, v)
-    return total
-
-
-# -------------------------
-# A*
-# -------------------------
-def reconstruct(came_from: Dict[Coord, Coord], current: Coord) -> List[Coord]:
-    path = [current]
-    while current in came_from:
-        current = came_from[current]
-        path.append(current)
-    path.reverse()
-    return path
-
-
-def astar(
-    width: int,
-    height: int,
-    start: Coord,
-    goal: Coord,
-    blocked: Set[Coord],
-    valid: Set[Coord],
-    *,
-    cable_limit_ft: float = CABLE_MAX_FT,
-    g_offset: float = 0.0,
-) -> Optional[List[Coord]]:
-    """A* pathfinding with diagonal moves and cable budget constraint."""
-    if start not in valid or goal not in valid:
-        return None
-    if start in blocked or goal in blocked:
-        return None
-
-    from heapq import heappush, heappop
-
-    h = weighted_octile
-    neigh = neighbors_8
-
-    open_heap: List[Tuple[float, Coord]] = []
-    heappush(open_heap, (g_offset + h(start, goal), start))
-    g: Dict[Coord, float] = {start: g_offset}
-    came_from: Dict[Coord, Coord] = {}
-    closed: Set[Coord] = set()
-
-    while open_heap:
-        _, current = heappop(open_heap)
-        if current in closed:
-            continue
-        if g[current] > cable_limit_ft:
-            continue
-
-        if current == goal and g[current] <= cable_limit_ft:
-            return reconstruct(came_from, current)
-
-        closed.add(current)
-
-        cx, cy = current
-        for nxt in neigh(cx, cy):
-            if not in_bounds(nxt, width, height):
-                continue
-            if nxt not in valid or nxt in blocked:
-                continue
-
-            tentative = g[current] + step_cost(current, nxt)
-            if tentative > cable_limit_ft:
-                continue
-            if tentative < g.get(nxt, float("inf")):
-                g[nxt] = tentative
-                came_from[nxt] = current
-                f = tentative + h(nxt, goal)
-                heappush(open_heap, (f, nxt))
+def astar_feet(start:Tuple[int,int],goal:Tuple[int,int],obstacles:set[Tuple[int,int]])->Optional[Tuple[List[Tuple[int,int]],float]]:
+    """A* search within 31x48 grid (internal top-down orientation)."""
+    import heapq
+    def inb(r,c): return 0<=r<MAX_ROW and 0<=c<MAX_COL
+    openh=[(0.0,start)]
+    g={start:0.0};came={}
+    while openh:
+        _,cur=heapq.heappop(openh)
+        if cur==goal:
+            path=[cur]
+            while cur in came:
+                cur=came[cur];path.append(cur)
+            path.reverse()
+            return path,g[goal]
+        cr,cc=cur
+        for nr,nc in neighbors_8(cr,cc):
+            if not inb(nr,nc):continue
+            if (nr,nc) in obstacles:continue
+            cost=segment_length_feet((cr,cc),(nr,nc))
+            newg=g[cur]+cost
+            if newg<g.get((nr,nc),1e9):
+                g[(nr,nc)]=newg;came[(nr,nc)]=cur
+                heapq.heappush(openh,(newg+h_feet((nr,nc),goal),(nr,nc)))
     return None
 
+# ----------------- Waypoints -----------------
+def classify_waypoints(items:List[dict])->Tuple[Tuple[int,int],List[Tuple[int,int]],Tuple[int,int]]:
+    s=e=None;m=[]
+    for p in items:
+        r,c=_pt_from_rc_or_xy(p);label=str(p.get("label","")).strip().upper()
+        if label=="START":s=(r,c)
+        elif label=="END":e=(r,c)
+        else:m.append((r,c))
+    if s is None or e is None:raise ValueError("Missing START or END")
+    return s,m,e
 
-# -------------------------
-# Safety buffer
-# -------------------------
-def inflate_obstacles(blocked: Set[Coord], valid: Set[Coord], width: int, height: int, radius: int = 1) -> Set[Coord]:
-    if radius <= 0:
-        return set(blocked)
-    inflated = set(blocked)
-    for (ox, oy) in list(blocked):
-        for dx in range(-radius, radius + 1):
-            for dy in range(-radius, radius + 1):
-                nx, ny = ox + dx, oy + dy
-                if 0 <= nx < width and 0 <= ny < height and (nx, ny) in valid:
-                    inflated.add((nx, ny))
-    return inflated
+# ----------------- Path composition -----------------
+def compute_path_through_waypoints(start,mids,end,obstacles)->Tuple[List[Tuple[int,int]],float]:
+    """Concatenate A* legs. User coords (0,0 bottom-left)."""
+    # Map everything to internal coords
+    to_int=lambda pt:(to_internal(pt[0]),pt[1])
+    start_i,to_i,end_i=to_int(start),[to_int(p) for p in mids],to_int(end)
+    obs_i={(to_internal(r),c) for (r,c) in obstacles}
 
+    full_i=[];total=0.0;cur=start_i
+    for nxt in to_i+[end_i]:
+        res=astar_feet(cur,nxt,obs_i)
+        if res is None: raise RuntimeError(f"No path {cur}->{nxt}")
+        seg,cost=res;total+=cost
+        full_i.extend(seg[1:] if full_i else seg)
+        cur=nxt
 
-# -------------------------
-# Core compute logic
-# -------------------------
-def compute_and_post(args) -> int:
-    try:
-        obstacles_list = get_obstacles()
-        waypoints_raw = get_waypoints()
-    except Exception as e:
-        log(f"[error] Failed to load JSON from endpoints: {e}")
-        return 2
+    # Convert back to user coords (bottom-left)
+    full_user=[(from_internal(r),c) for r,c in full_i]
 
-    starts = [xy for (xy, t) in waypoints_raw if t == "start"]
-    ends = [xy for (xy, t) in waypoints_raw if t == "end"]
-    mids = [xy for (xy, t) in waypoints_raw if t == "waypoint"]
+    check=polyline_feet(full_i)
+    if abs(check-total)>1e-6:print(f"[warn] A*={total:.4f}, poly={check:.4f}")
+    return full_user,total
 
-    if not starts or not ends:
-        log("[error] Waypoints must include at least one 'start' and one 'end'.")
-        return 2
-    if len(starts) > 1 or len(ends) > 1:
-        log("[warn] Multiple starts/ends provided; using the first of each.")
+# ----------------- IO -----------------
+async def fetch_json(session,url):
+    async with session.get(url) as r:
+        r.raise_for_status()
+        try:return await r.json()
+        except: return json.loads(await r.text())
 
-    start = starts[0]
-    goal = ends[0]
-    ordered_pts: List[Coord] = [start] + mids + [goal]
+async def put_path(session,path):
+    pts=[{"r":int(r),"c":int(c)} for r,c in path]
+    async with session.put(PATH_PUT_URL,json=pts) as r:
+        txt=await r.text();ok=200<=r.status<300
+        stamp=time.strftime("%Y-%m-%d %H:%M:%S")
+        if ok:print(f"[{stamp}] [ok] PUT /grid/path ({len(pts)} pts)")
+        else:print(f"[{stamp}] [err] PUT /grid/path {r.status}: {txt[:120]}")
 
-    xs = [x for (x, y) in obstacles_list] + [x for (x, y) in ordered_pts]
-    ys = [y for (x, y) in obstacles_list] + [y for (x, y) in ordered_pts]
-    if not xs or not ys:
-        log("[error] No points to define grid extents.")
-        return 2
-    width, height = max(xs) + 1, max(ys) + 1
-    valid: Set[Coord] = {(x, y) for y in range(height) for x in range(width)}
+# ----------------- Watch loop -----------------
+async def load_inputs(session):
+    w=_unwrap_data(await fetch_json(session,WAYPOINTS_URL))
+    o=_unwrap_data(await fetch_json(session,OBSTACLES_URL))
+    s,m,e=classify_waypoints(w)
+    obs=set(_pt_from_rc_or_xy(p) for p in o)
+    return s,m,e,obs,_hash_text(json.dumps(w,sort_keys=True)),_hash_text(json.dumps(o,sort_keys=True))
 
-    base_blocked = set(obstacles_list) & valid
-    inflated_blocked = inflate_obstacles(base_blocked, valid, width, height, radius=1)
+async def recompute_once(session):
+    s,m,e,o,_,_=await load_inputs(session)
+    path,total=compute_path_through_waypoints(s,m,e,o)
+    print(f"[info] path length (A*): {total:.3f} ft")
+    if total>MAX_CABLE_FT:print("NO VIABLE PATH");return
+    await put_path(session,path)
 
-    total_path: List[Coord] = []
-    used_feet = 0.0
-    ok = True
+class WatchState:
+    def __init__(self):self.hw=self.ho=None;self.cool_until=0.0
 
-    for i in range(len(ordered_pts) - 1):
-        a = ordered_pts[i]
-        b = ordered_pts[i + 1]
-        splice = len(total_path) > 0
-        seg = astar(width, height, a, b, inflated_blocked, valid, cable_limit_ft=args.cable_ft, g_offset=used_feet)
-        if seg is None:
-            log(f"No path found between {a} -> {b} within cable limit {args.cable_ft:.3f} ft.")
-            ok = False
-            break
-        seg_len = path_length_feet(seg)
-        used_feet = seg_len
-        total_path.extend(seg[1:] if splice else seg)
+async def watch_loop():
+    st=WatchState()
+    print(f"[watch] interval={POLL_INTERVAL_SEC}s debounce={DEBOUNCE_MS}ms")
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as s:
+        try:await recompute_once(s);_,_,_,_,st.hw,st.ho=await load_inputs(s)
+        except Exception as e:print(f"[error] init:{e}")
+        while True:
+            await asyncio.sleep(POLL_INTERVAL_SEC)
+            try:
+                await asyncio.sleep(DEBOUNCE_MS/1000)
+                s_,m_,e_,o_,hw,ho=await load_inputs(s)
+                if hw==st.hw and ho==st.ho:continue
+                print("[watch] change detected")
+                if time.time()<st.cool_until:continue
+                try:
+                    p,t=compute_path_through_waypoints(s_,m_,e_,o_)
+                    print(f"[info] path length (A*): {t:.3f} ft")
+                    if t<=MAX_CABLE_FT:
+                        await put_path(s,p);st.hw,st.ho=hw,ho;st.cool_until=time.time()+COOLDOWN_SEC
+                    else:print("NO VIABLE PATH")
+                except Exception as e:print(f"[error] recompute:{e}")
+            except Exception as e:print(f"[error] loop:{e}")
 
-    if not ok:
-        return 1
+def main():
+    try:asyncio.run(watch_loop())
+    except KeyboardInterrupt:print("\n[shutdown] bye!")
 
-    total_feet = path_length_feet(total_path)
-    log(f"[ok] Path length: {total_feet:.3f} ft (limit {args.cable_ft:.3f} ft) | nodes: {len(total_path)} | waypoints: {len(ordered_pts)}")
-    try:
-        post_path_json(total_path, total_feet)
-        log("[info] Path posted to /path")
-    except Exception as e:
-        log(f"[warn] Failed to POST path to {POST_PATH_URL}: {e}")
-        return 1
-
-    return 0
-
-
-# -------------------------
-# Watcher (with debounce + cooldown)
-# -------------------------
-def _stable_hash_json(obj) -> str:
-    def _normalize(o):
-        if isinstance(o, dict):
-            return {k: _normalize(o[k]) for k in sorted(o.keys())}
-        if isinstance(o, list):
-            return [_normalize(x) for x in o]
-        return o
-
-    norm = _normalize(obj)
-    s = json.dumps(norm, separators=(",", ":"), sort_keys=True)
-    return hashlib.sha256(s.encode("utf-8")).hexdigest()
-
-
-def _fetch_raw():
-    return (
-        requests.get(OBSTACLES_URL, timeout=5).json(),
-        requests.get(WAYPOINTS_URL, timeout=5).json(),
-    )
-
-
-def run_watcher(args) -> None:
-    log(f"[watch] Starting watcher: interval={args.interval:.3f}s, debounce={args.debounce_ms}ms, cooldown={args.cooldown:.3f}s")
-    last_obs_hash = last_wp_hash = None
-    last_rc = None
-    debounce_deadline = 0.0
-    last_compute_end_ts = 0.0
-
-    while True:
-        t0 = time.time()
-        try:
-            obs_raw, wp_raw = _fetch_raw()
-            h_obs = _stable_hash_json(obs_raw)
-            h_wp = _stable_hash_json(wp_raw)
-            changed = (h_obs != last_obs_hash) or (h_wp != last_wp_hash)
-
-            if changed:
-                debounce_deadline = max(debounce_deadline, t0) + (args.debounce_ms / 1000.0)
-                last_obs_hash, last_wp_hash = h_obs, h_wp
-                log("[watch] Change detected. Debouncing...")
-
-            now = time.time()
-            cooldown_ok = (now - last_compute_end_ts) >= args.cooldown
-            if last_obs_hash and last_wp_hash and now >= debounce_deadline and cooldown_ok:
-                rc = compute_and_post(args)
-                last_compute_end_ts = time.time()
-                if rc != last_rc:
-                    status = "OK" if rc == 0 else f"ERR({rc})"
-                    log(f"[watch] Recompute status: {status}")
-                last_rc = rc
-                debounce_deadline = float("inf")
-
-        except KeyboardInterrupt:
-            log("[watch] Stopped by user.")
-            break
-        except Exception as e:
-            log(f"[watch] Poll error: {e}")
-
-        dt = time.time() - t0
-        time.sleep(max(0.0, args.interval - dt))
-
-
-# -------------------------
-# CLI
-# -------------------------
-def main(argv: List[str]) -> int:
-    ap = argparse.ArgumentParser(description="A* with JSON endpoints + waypoints + cable limit + watcher (headless, diagonals always enabled).")
-    ap.add_argument("--cable-ft", type=float, default=CABLE_MAX_FT, help="Cable length budget in feet.")
-    ap.add_argument("--once", action="store_true", help="Run a single compute and exit (disables watcher).")
-    ap.add_argument("--interval", type=float, default=2.0, help="Polling interval in seconds (default 2.0).")
-    ap.add_argument("--debounce-ms", type=int, default=150, help="Debounce window in milliseconds (default 150).")
-    ap.add_argument("--cooldown", type=float, default=2.0, help="Cooldown after compute in seconds (default 2.0).")
-    args = ap.parse_args(argv)
-
-    if args.once:
-        return compute_and_post(args)
-    run_watcher(args)
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+if __name__=="__main__":main()

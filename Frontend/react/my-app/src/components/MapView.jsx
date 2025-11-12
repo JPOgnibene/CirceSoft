@@ -15,7 +15,10 @@ export default function MapView({
   setObstacleCount,
   setHasUnsavedObstacleChanges,
   exportPathRef,
-  clearPathRef
+  clearPathRef,
+  revertPathRef,
+  setHasUnsavedPathChanges,
+  hasUnsavedPathChanges
 }) {
   const [imgDimensions, setImgDimensions] = useState({ width: 0, height: 0 });
   const [image, setBackgroundImg] = useState(null);
@@ -99,6 +102,9 @@ export default function MapView({
                 setHasUnsavedObstacleChanges={setHasUnsavedObstacleChanges}
                 exportPathRef={exportPathRef}
                 clearPathRef={clearPathRef}
+                revertPathRef={revertPathRef}
+                setHasUnsavedPathChanges={setHasUnsavedPathChanges}
+                hasUnsavedPathChanges={hasUnsavedPathChanges}
               />
             </div>
           </TransformComponent>

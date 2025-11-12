@@ -20,6 +20,9 @@ const ClickToPath = ({
   setHasUnsavedObstacleChanges,
   exportPathRef,
   clearPathRef,
+  revertPathRef,
+  setHasUnsavedPathChanges,
+  hasUnsavedPathChanges
 }) => {
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 800, height: 600 });
@@ -27,6 +30,10 @@ const ClickToPath = ({
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragPosition, setDragPosition] = useState(null);
+
+  const [savedPath, setSavedPath] = useState([]); // Last saved/imported state
+  const [unsavedPath, setUnsavedPath] = useState([]); // Current working state
+  // const [hasUnsavedPathChanges, setHasUnsavedPathChanges] = useState(false);
   
   // Get WebSocket data - store in local state to ensure re-renders
   const ws = useWebSocket();
@@ -129,17 +136,17 @@ const ClickToPath = ({
   };
   // Export path to server
   const exportPath = async () => {
-    if (path.length === 0) {
+    if (unsavedPath.length === 0) {
       if (messageBoxRef?.current) {
         messageBoxRef.current.addMessage('warning', 'No path to export');
       }
       return;
     }
     const pathLength = calculatePathLength();
-    const pathData = path.map((point, index) => {
+    const pathData = unsavedPath.map((point, index) => {
       if (index === 0) {
         return { r: point.y, c: point.x, label: "START" };
-      } else if (index === path.length - 1) {
+      } else if (index === unsavedPath.length - 1) {
         return { r: point.y, c: point.x, label: "END" };
       }
       return { r: point.y, c: point.x, label: "WAYPOINT" };
@@ -157,12 +164,15 @@ const ClickToPath = ({
       
       const result = await response.json();
       console.log("Path exported:", result);
-      console.log("Path length:", pathLength);
+      
+      // Update the saved path state
+      setSavedPath(unsavedPath);
+      setHasUnsavedPathChanges(false);
       
       if (messageBoxRef?.current) {
         messageBoxRef.current.addMessage(
           'success', 
-          `Path exported: ${path.length} waypoints, ` +
+          `Path exported: ${unsavedPath.length} waypoints, ` +
           `Distance: ${pathLength.feet.toFixed(2)} ft (${pathLength.meters.toFixed(2)} m)`
         );
       }
@@ -173,11 +183,23 @@ const ClickToPath = ({
       }
     }
   };
+
+  // Add this new revertPath function:
+  const revertPath = () => {
+    setPath(savedPath);
+    setUnsavedPath(savedPath);
+    setHasUnsavedPathChanges(false);
+    if (messageBoxRef?.current) {
+      messageBoxRef.current.addMessage('info', 'Path changes reverted to last saved state');
+    }
+  };
   // Clear current path
   const clearPath = () => {
     setPath([]);
+    setUnsavedPath([]);
+    setHasUnsavedPathChanges(true);
     if (messageBoxRef?.current) {
-      messageBoxRef.current.addMessage('info', 'Path cleared');
+      messageBoxRef.current.addMessage('info', 'Path cleared - not saved');
     }
   };
   // Expose path functions via refs
@@ -191,6 +213,40 @@ const ClickToPath = ({
       clearPathRef.current = clearPath;
     }
   }, [clearPathRef]);
+
+  // Add after existing useEffect hooks
+
+  // Sync path prop with unsavedPath
+  useEffect(() => {
+    setUnsavedPath(path);
+  }, [path]);
+
+  // Expose revertPath via ref
+  useEffect(() => {
+    if (revertPathRef) {
+      revertPathRef.current = revertPath;
+    }
+  }, [savedPath, unsavedPath, hasUnsavedPathChanges, revertPathRef]);
+
+  // Track when path changes from saved state
+  useEffect(() => {
+    if (JSON.stringify(path) !== JSON.stringify(savedPath)) {
+      setHasUnsavedPathChanges(true);
+    } else {
+      setHasUnsavedPathChanges(false);
+    }
+  }, [path, savedPath]);
+
+  // Update parent component about unsaved changes
+  useEffect(() => {
+    if (setHasUnsavedPathChanges) {
+      setHasUnsavedPathChanges(hasUnsavedPathChanges);
+    }
+  }, [hasUnsavedPathChanges, setHasUnsavedPathChanges]);
+
+
+
+
   // Delete a specific point
   const deletePoint = (index) => {
     const deletedPoint = path[index];

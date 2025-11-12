@@ -13,6 +13,8 @@ const GridMap = ({
   onRevertObstacles,
   onObstacleCountChange,
   onUnsavedChangesChange,
+  revertPathRef,
+  onHasUnsavedPathChanges,
 }) => {
   const [gridData, setGridData] = useState([]);
   const [obstacles, setObstacles] = useState([]); // Last saved/imported state

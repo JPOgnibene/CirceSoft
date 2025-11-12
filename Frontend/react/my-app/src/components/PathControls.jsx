@@ -4,19 +4,22 @@ const PathControls = ({
   mode,
   setMode,
   path,
-  setPath, // ADD THIS PROP
+  setPath,
   pathLength,
   distanceTraveled,
   isMoving,
   obstacleCount,
   hasUnsavedObstacleChanges,
+  hasUnsavedPathChanges,
   onExportPath,
   onClearPath,
   onImportObstacles,
   onExportObstacles,
   onClearObstacles,
   onRevertObstacles,
-  messageBoxRef, // ADD THIS PROP
+  onRevertPath,
+  onPathImported,
+  messageBoxRef,
 }) => {
   const PATH_JSON_ENDPOINT = "http://localhost:8765/grid/path";
 
@@ -43,6 +46,11 @@ const PathControls = ({
       }));
       
       setPath(convertedPath);
+      
+      // ADD THESE LINES to notify ClickToPath that this is a saved state
+      if (onPathImported) {
+        onPathImported(convertedPath);
+      }
       
       if (messageBoxRef?.current) {
         messageBoxRef.current.addMessage('success', `Path imported: ${convertedPath.length} waypoints`);
@@ -141,7 +149,7 @@ const PathControls = ({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr",
+            gridTemplateColumns: "1fr 1fr",
             gap: "12px",
             marginBottom: "12px",
             width: "100%",
@@ -153,8 +161,38 @@ const PathControls = ({
           >
             ⬆ IMPORT PATH
           </button>
+          <button
+            onClick={onExportPath}
+            disabled={!hasUnsavedPathChanges}
+            style={{
+              ...actionButtonStyle(
+                hasUnsavedPathChanges,
+                "#00d9ff",
+                "rgba(0, 217, 255, 0.2)"
+              ),
+              position: "relative",
+            }}
+          >
+            ⬇ EXPORT PATH
+            {hasUnsavedPathChanges && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: "6px",
+                  right: "6px",
+                  width: "8px",
+                  height: "8px",
+                  backgroundColor: "#ff4757",
+                  borderRadius: "0",
+                  border: "1px solid #ff4757",
+                  boxShadow: "0 0 10px rgba(255, 71, 87, 0.8)",
+                  animation: "pulse 2s ease-in-out infinite",
+                }}
+              />
+            )}
+          </button>
         </div>
-        {/* Button grid - NOW 3 BUTTONS */}
+        {/* Button grid - 3 BUTTONS */}
         <div
           style={{
             display: "grid",
@@ -164,23 +202,7 @@ const PathControls = ({
             width: "100%",
           }}
         >
-          {/* <button
-            onClick={handleImportPath}
-            style={actionButtonStyle(true, "#00ff9f", "rgba(0, 255, 159, 0.2)")}
-          >
-            ⬆ IMPORT PATH
-          </button> */}
-          <button
-            onClick={onExportPath}
-            disabled={path.length === 0}
-            style={actionButtonStyle(
-              path.length > 0,
-              "#00d9ff",
-              "rgba(0, 217, 255, 0.2)"
-            )}
-          >
-            ⬇ EXPORT PATH
-          </button>
+          
           <button
             onClick={onClearPath}
             disabled={path.length === 0}
@@ -191,6 +213,17 @@ const PathControls = ({
             )}
           >
             ✕ CLEAR PATH
+          </button>
+          <button
+            onClick={onRevertPath}
+            disabled={!hasUnsavedPathChanges}
+            style={actionButtonStyle(
+              hasUnsavedPathChanges,
+              "#ff4757",
+              "rgba(255, 71, 87, 0.2)"
+            )}
+          >
+            ↺ REVERT
           </button>
         </div>
 
@@ -215,16 +248,38 @@ const PathControls = ({
                 letterSpacing: "0.5px",
                 fontFamily: "'Courier New', monospace",
                 textTransform: "uppercase",
-                textAlign: "center",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "10px",
               }}
             >
-              TOTAL{" "}
-              <span style={{ color: "#fff", marginLeft: "8px" }}>
-                {pathLength.feet.toFixed(2)} FT
+              <span>
+                TOTAL{" "}
+                <span style={{ color: "#fff", marginLeft: "8px" }}>
+                  {pathLength.feet.toFixed(2)} FT
+                </span>
+                <span style={{ color: "#6b7280", marginLeft: "6px" }}>
+                  ({pathLength.meters.toFixed(2)} M)
+                </span>
               </span>
-              <span style={{ color: "#6b7280", marginLeft: "6px" }}>
-                ({pathLength.meters.toFixed(2)} M)
-              </span>
+              {hasUnsavedPathChanges && (
+                <span
+                  style={{
+                    fontSize: "0.7rem",
+                    padding: "3px 8px",
+                    backgroundColor: "rgba(255, 71, 87, 0.2)",
+                    border: "1px solid #ff4757",
+                    borderRadius: "2px",
+                    fontWeight: "700",
+                    letterSpacing: "1px",
+                    boxShadow: "0 0 10px rgba(255, 71, 87, 0.3)",
+                    color: "#ff4757",
+                  }}
+                >
+                  UNSAVED
+                </span>
+              )}
             </div>
             <div
               style={{

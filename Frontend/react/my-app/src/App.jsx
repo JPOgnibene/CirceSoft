@@ -25,12 +25,14 @@ function AppContent({ messageBoxRef }) {
   const [mode, setMode] = useState("path");
   const [obstacleCount, setObstacleCount] = useState(0);
   const [hasUnsavedObstacleChanges, setHasUnsavedObstacleChanges] = useState(false);
+  const [hasUnsavedPathChanges, setHasUnsavedPathChanges] = useState(false);
   
   // Refs for obstacle functions
   const importObstaclesRef = useRef(null); // ADD THIS LINE
   const exportObstaclesRef = useRef(null);
   const clearObstaclesRef = useRef(null);
   const revertObstaclesRef = useRef(null);
+  const revertPathRef = useRef(null);
   
   // Refs for path functions
   const exportPathRef = useRef(null);
@@ -40,11 +42,6 @@ function AppContent({ messageBoxRef }) {
   const ws = useWebSocket();
   const distanceTraveled = ws?.distanceTraveled || 0;
   const isMoving = ws?.isMoving || false;
-  
-  // Handler for imported path
-  const handlePathImported = (importedPath) => {
-    setPath(importedPath);
-  };
   
   // Calculate path length (same logic as in ClickToPath)
   const GRID_CELL_SIZE_FEET = 2;
@@ -72,6 +69,15 @@ function AppContent({ messageBoxRef }) {
   };
   
   const pathLength = calculatePathLength();
+
+    // Handler for imported path
+  const handlePathImported = (importedPath) => {
+    setPath(importedPath);
+    // Notify ClickToPath to set this as saved state
+    if (importPathRef.current) {
+      importPathRef.current(importedPath);
+    }
+  };
   
   // Handlers for PathControls
   const handleExportPath = () => {
@@ -110,6 +116,12 @@ function AppContent({ messageBoxRef }) {
       revertObstaclesRef.current();
     }
   };
+
+  const handleRevertPath = () => {
+    if (revertPathRef.current) {
+      revertPathRef.current();
+    }
+  };
   
   return (
     <div>
@@ -118,9 +130,9 @@ function AppContent({ messageBoxRef }) {
           <div className="icon">
             <WebsocketStatusIcon messageBoxRef={messageBoxRef} />
           </div>
-          <div className="clickIcon">
+          {/* <div className="clickIcon">
             <ImportPathIcon messageBoxRef={messageBoxRef} onPathImported={handlePathImported}/>
-          </div>
+          </div> */}
           {/* <div className="clickIcon">
             <PlayButtonIcon messageBoxRef={messageBoxRef} />
           </div>
@@ -179,6 +191,9 @@ function AppContent({ messageBoxRef }) {
             onExportObstacles={handleExportObstacles}
             onClearObstacles={handleClearObstacles}
             onRevertObstacles={handleRevertObstacles}
+            onRevertPath={handleRevertPath}
+            hasUnsavedPathChanges={hasUnsavedPathChanges}
+            onPathImported={handlePathImported}
             messageBoxRef={messageBoxRef}
           />
           <MessageWindow ref={messageBoxRef} />
@@ -198,7 +213,11 @@ function AppContent({ messageBoxRef }) {
             setHasUnsavedObstacleChanges={setHasUnsavedObstacleChanges}
             exportPathRef={exportPathRef}
             clearPathRef={clearPathRef}
+            revertPathRef={revertPathRef}
+            setHasUnsavedPathChanges={setHasUnsavedPathChanges} 
+            hasUnsavedPathChanges={hasUnsavedPathChanges}
           />
+
           <div className="bottom-progress">
             <Progress distanceTraveled={distanceTraveled} pathLength={pathLength} />
           </div>

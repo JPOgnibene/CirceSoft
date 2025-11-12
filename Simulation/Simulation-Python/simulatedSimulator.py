@@ -1,29 +1,29 @@
 #!/usr/bin/env python3
 """
-CirceBot Simulator (tolerant /directions reader)
+CirceBot Simulator (HTTP polling, aligned with planner distance)
 
-Hard-coded endpoints:
-  GET  http://localhost:8765/directions
-  GET  http://localhost:8765/grid/path
-  PUT  http://localhost:8765/current-values
+Endpoints:
+  GET  http://localhost:8765/directions      -> "START"/"STOP" or {"directions"|"command": "..."}
+  GET  http://localhost:8765/grid/path       -> bare list OR {"data":[{"r","c"}, ...]}
+  PUT  http://localhost:8765/current-values  -> status JSON
 
 Behavior:
-  - Waits for explicit START (does not auto-start).
-  - Accepts /directions as:
-        {"directions":"START"}  OR  {"command":"START"}  OR plain "START"
-  - Loads /grid/path once and only reloads when content changes (hash).
-  - Moves 2 ft/s with custom scaling:
-        X: 7.5 ft,  Y: 5.16129 ft,  Diagonal: 9.104334 ft
-  - Tracks cableRemaining_ft (300 ft max), distanceTraveled_ft, distanceRemaining_ft.
-  - Battery -1% at each waypoint arrival.
-  - On START: immediate heartbeat PUT (isMoving=true).
-  - On STOP: immediate PUT (isMoving=false, Heading="stopped").
-  - On final waypoint: PUT (isMoving=false, Heading="idle").
-  - Prints full JSON on EVERY PUT.
+  - Waits idly until it reads "START" from /directions.
+  - Loads /grid/path and only reloads when content changes (hash check).
+  - Moves 2 ft/s using custom axis/diagonal scales:
+        X (Δc): 7.5 ft,  Y (Δr): 5.16129 ft,  Diagonal: 9.104334 ft per cell
+  - Tracks:
+        cableRemaining_ft (starts at 300 ft and decrements by actual distance moved),
+        distanceTraveled_ft (cumulative),
+        distanceRemaining_ft (from current position to end of path; same math as planner).
+  - Battery drops 1% on each waypoint arrival.
+  - On START: immediate heartbeat PUT with isMoving=true.
+  - On STOP: immediate PUT with isMoving=false and Heading="stopped".
+  - On final waypoint: PUT with isMoving=false and Heading="idle".
+  - Prints the full JSON payload on EVERY PUT.
 """
 
 import asyncio
-import math
 import json
 import hashlib
 from datetime import datetime, timezone
@@ -46,15 +46,25 @@ CABLE_MAX_FT = 300.0
 def iso_now():
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
-def step_length_feet(a, b):
-    dr = abs(b["r"] - a["r"])
-    dc = abs(b["c"] - a["c"])
-    if dr == 0.0 and dc == 0.0:
+# ===== Shared distance math (identical to planner) =====
+def segment_length_feet(a: dict, b: dict) -> float:
+    """Feet between ANY two points a->{r,c}, b->{r,c} (adjacent or not)."""
+    ar, ac = int(round(a["r"])), int(round(a["c"]))
+    br, bc = int(round(b["r"])), int(round(b["c"]))
+    dr = abs(br - ar)
+    dc = abs(bc - ac)
+    if dr == 0 and dc == 0:
         return 0.0
-    diag = min(dr, dc)
-    rem_r = dr - diag
-    rem_c = dc - diag
-    return diag * DIAG_SCALE + rem_r * Y_SCALE + rem_c * X_SCALE
+    d = min(dr, dc)                 # number of diagonal steps
+    rem_r = dr - d                  # remaining vertical steps
+    rem_c = dc - d                  # remaining horizontal steps
+    return d * DIAG_SCALE + rem_r * Y_SCALE + rem_c * X_SCALE
+
+def polyline_feet(points: list[dict]) -> float:
+    total = 0.0
+    for i in range(len(points) - 1):
+        total += segment_length_feet(points[i], points[i+1])
+    return total
 
 def grid_to_xy_feet(r, c):
     return {"x": c * X_SCALE, "y": r * Y_SCALE}
@@ -62,50 +72,55 @@ def grid_to_xy_feet(r, c):
 # -------------------------------------------------------------
 class Simulator:
     def __init__(self):
-        self.path = []
-        self.curr = {"r": 0.0, "c": 0.0}
+        self.path: list[dict] = []           # [{"r":float,"c":float}, ...]
+        self.curr = {"r": 0.0, "c": 0.0}     # fractional allowed between waypoints
         self.next_idx = 0
         self.running = False
         self.prev_running = False
         self.percent_batt = 100
         self.cable_remaining_ft = CABLE_MAX_FT
         self.distance_traveled_ft = 0.0
-        self._last_path_hash = None
+        self._last_path_hash: str | None = None
 
-    # ---------- /directions helper ----------
+    # ---------- /directions ----------
     @staticmethod
-    def _normalize_dir_value(val: str) -> str:
-        if not isinstance(val, str):
-            return "STOP"
-        return val.strip().upper()
+    def _normalize_dir_value(val) -> str:
+        if isinstance(val, str):
+            return val.strip().upper()
+        if isinstance(val, dict):
+            if "directions" in val:
+                return str(val["directions"]).strip().upper()
+            if "command" in val:
+                return str(val["command"]).strip().upper()
+        return "STOP"
 
     async def get_directions(self, session) -> str:
-        """Read /directions as JSON or raw text. Accept keys 'directions' or 'command'."""
         try:
             async with session.get(HTTP_DIR_URL) as r:
                 r.raise_for_status()
                 raw = await r.text()
+                raw_s = raw.strip()
+                if raw_s.startswith("{"):
+                    try:
+                        obj = json.loads(raw_s)
+                        return self._normalize_dir_value(obj)
+                    except Exception:
+                        pass
+                return self._normalize_dir_value(raw_s)
         except Exception as e:
             print(f"[{iso_now()}] directions fetch failed: {e}")
             return "STOP"
 
-        raw_stripped = raw.strip()
-
-        # Try JSON first
-        if raw_stripped.startswith("{"):
-            try:
-                data = json.loads(raw_stripped)
-                # Prefer 'directions', but accept 'command'
-                if isinstance(data, dict):
-                    if "directions" in data:
-                        return self._normalize_dir_value(data["directions"])
-                    if "command" in data:
-                        return self._normalize_dir_value(data["command"])
-            except Exception:
-                pass  # fall through to raw text
-
-        # Raw text fallback ("START"/"STOP")
-        return self._normalize_dir_value(raw_stripped)
+    # ---------- /grid/path ----------
+    def _warn_non_adjacent(self):
+        bad = []
+        for i in range(len(self.path) - 1):
+            r0, c0 = self.path[i]["r"], self.path[i]["c"]
+            r1, c1 = self.path[i+1]["r"], self.path[i+1]["c"]
+            if abs(r1 - r0) > 1 or abs(c1 - c0) > 1:
+                bad.append((i, (r0, c0), (r1, c1)))
+        if bad:
+            print(f"[warn] path contains {len(bad)} non-adjacent step(s); sample: {bad[:3]}")
 
     async def load_path_if_changed(self, session):
         try:
@@ -122,7 +137,9 @@ class Simulator:
 
         try:
             obj = json.loads(raw)
-            pts = obj.get("data", [])
+            pts = obj.get("data") if isinstance(obj, dict) else obj   # accept bare list or {"data":[...]}
+            if not isinstance(pts, list):
+                raise ValueError("grid/path must be a list of points or {data:[...]}")
             new_path = [{"r": float(p["r"]), "c": float(p["c"])} for p in pts if "r" in p and "c" in p]
         except Exception as e:
             print(f"[{iso_now()}] path parse failed: {e}")
@@ -131,15 +148,20 @@ class Simulator:
         self.path = new_path
         self._last_path_hash = new_hash
         self.next_idx = 0
-        print(f"[{iso_now()}] Loaded path with {len(self.path)} waypoints (changed).")
+
+        total_ft = polyline_feet(self.path) if len(self.path) >= 2 else 0.0
+        print(f"[{iso_now()}] Loaded path with {len(self.path)} points; total length ≈ {total_ft:.3f} ft (sim).")
+        self._warn_non_adjacent()
 
     # ---------- Distances ----------
-    def distance_remaining_ft(self):
+    def distance_remaining_ft(self) -> float:
+        """Feet from current position to end, using the same metric as the planner."""
         if not self.path or self.next_idx >= len(self.path):
             return 0.0
-        total = step_length_feet(self.curr, self.path[self.next_idx])
+        total = segment_length_feet(self.curr, self.path[self.next_idx])
+        # Add the remainder of the polyline from next_idx onward
         for i in range(self.next_idx, len(self.path) - 1):
-            total += step_length_feet(self.path[i], self.path[i + 1])
+            total += segment_length_feet(self.path[i], self.path[i+1])
         return total
 
     # ---------- Status PUT ----------
@@ -151,7 +173,6 @@ class Simulator:
             heading = f"to r={int(round(nxt['r']))}, c={int(round(nxt['c']))}" if nxt else "idle"
 
         xy = grid_to_xy_feet(self.curr["r"], self.curr["c"])
-
         payload = {
             "X_ECI": xy["x"],
             "Y_ECI": xy["y"],
@@ -182,12 +203,13 @@ class Simulator:
     # ---------- Main loop ----------
     async def run(self):
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
+            # Load path (if available) so we can log its length; it will re-load on change
             await self.load_path_if_changed(session)
 
-            # Wait for explicit START AND a non-empty path
+            # Wait for explicit START and non-empty path
             print(f"[{iso_now()}] Waiting for START and a non-empty /grid/path...")
             while True:
-                dir_value = (await self.get_directions(session))
+                dir_value = (await self.get_directions(session)).upper()
                 print(f"[{iso_now()}] /directions -> {dir_value}")
                 await self.load_path_if_changed(session)
                 has_path = bool(self.path)
@@ -195,47 +217,64 @@ class Simulator:
                     self.running = True
                     self.prev_running = True
                     first_target = self.path[0]
-                    print(f"[{iso_now()}] START received with {len(self.path)} waypoints. First target: r={int(first_target['r'])}, c={int(first_target['c'])}")
+                    print(f"[{iso_now()}] START received with {len(self.path)} points. First target: r={int(first_target['r'])}, c={int(first_target['c'])}")
                     await self.put_status(session, waypoint_number_1based=None, is_moving=True, note="START received; beginning movement")
                     break
                 elif dir_value == "START" and not has_path:
                     print(f"[{iso_now()}] START received, but path is empty — still waiting for /grid/path ...")
                 await asyncio.sleep(1.0)
 
+            # Movement loop
             while True:
+                # Controls
                 self.running = (await self.get_directions(session)) == "START"
 
+                # STOP edge -> immediate PUT with isMoving:false
                 if self.prev_running and not self.running:
                     print(f"[{iso_now()}] STOP received — pausing movement.")
                     await self.put_status(session, waypoint_number_1based=None, is_moving=False, note="STOP received")
 
                 self.prev_running = self.running
+
+                # Only reload path if changed
                 await self.load_path_if_changed(session)
 
+                # Idle if not running / no path / finished
                 if not self.running or not self.path or self.next_idx >= len(self.path):
                     await asyncio.sleep(POLL_DT)
                     continue
 
+                # Move toward next waypoint
                 target = self.path[self.next_idx]
                 prev = dict(self.curr)
-                remaining_ft = step_length_feet(prev, target)
+                remaining_ft = segment_length_feet(prev, target)
                 step_ft = SPEED_FTPS * POLL_DT
 
                 if remaining_ft <= 1e-9 or step_ft >= remaining_ft:
+                    # Arrive at waypoint
                     moved_ft = remaining_ft
                     self.curr = {"r": target["r"], "c": target["c"]}
                     self.distance_traveled_ft += moved_ft
                     self.cable_remaining_ft = max(self.cable_remaining_ft - moved_ft, 0.0)
                     self.percent_batt = max(self.percent_batt - 1, 0)
-                    seq_num = self.next_idx + 1
+
+                    seq_num = self.next_idx + 1  # 1-based
                     self.next_idx += 1
+
                     still_has_next = self.next_idx < len(self.path)
                     is_moving_now = self.running and still_has_next
-                    await self.put_status(session, waypoint_number_1based=seq_num, is_moving=is_moving_now,
-                                          note=f"Reached waypoint {seq_num}")
+
+                    await self.put_status(
+                        session,
+                        waypoint_number_1based=seq_num,
+                        is_moving=is_moving_now,
+                        note=f"Reached waypoint {seq_num}"
+                    )
+
                     if not still_has_next:
                         print(f"[{iso_now()}] Route complete — no more waypoints.")
                 else:
+                    # Partial progress
                     ratio = step_ft / remaining_ft
                     self.curr = {
                         "r": prev["r"] + (target["r"] - prev["r"]) * ratio,

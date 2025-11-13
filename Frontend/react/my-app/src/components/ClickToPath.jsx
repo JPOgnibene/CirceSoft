@@ -136,17 +136,17 @@ const ClickToPath = ({
   };
   // Export path to server
   const exportPath = async () => {
-    if (unsavedPath.length === 0) {
+    if (path.length === 0) {
       if (messageBoxRef?.current) {
         messageBoxRef.current.addMessage('warning', 'No path to export');
       }
       return;
     }
     const pathLength = calculatePathLength();
-    const pathData = unsavedPath.map((point, index) => {
+    const pathData = path.map((point, index) => {
       if (index === 0) {
         return { r: point.y, c: point.x, label: "START" };
-      } else if (index === unsavedPath.length - 1) {
+      } else if (index === path.length - 1) {
         return { r: point.y, c: point.x, label: "END" };
       }
       return { r: point.y, c: point.x, label: "WAYPOINT" };
@@ -166,13 +166,13 @@ const ClickToPath = ({
       console.log("Path exported:", result);
       
       // Update the saved path state
-      setSavedPath(unsavedPath);
+      setSavedPath(path);
       setHasUnsavedPathChanges(false);
       
       if (messageBoxRef?.current) {
         messageBoxRef.current.addMessage(
           'success', 
-          `Path exported: ${unsavedPath.length} waypoints, ` +
+          `Path exported: ${path.length} waypoints, ` +
           `Distance: ${pathLength.feet.toFixed(2)} ft (${pathLength.meters.toFixed(2)} m)`
         );
       }

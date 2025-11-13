@@ -45,6 +45,7 @@ const GridMap = ({
   }, [gridData]);
 
   // Fetch grid data on startup
+  // Fetch grid data on startup
   useEffect(() => {
     const fetchGrid = async () => {
       try {
@@ -55,7 +56,7 @@ const GridMap = ({
           row: point.row,
           col: point.col,
           x: point.x,
-          y: point.y,
+          y: imgDimensions.height - point.y,  // Fixed typo
           r: point.row,
           c: point.col
         }));
@@ -65,8 +66,8 @@ const GridMap = ({
       }
     };
     fetchGrid();
-  }, []);
-
+  }, [imgDimensions.height]);  // Fixed dependency
+  
   // DO NOT fetch obstacles automatically on startup anymore
   // Obstacles will only be loaded when user clicks "Import Obstacles"
 
@@ -369,6 +370,7 @@ const GridMap = ({
           top: 0,
           left: 0,
           cursor: mode === "obstacle" ? "pointer" : "default",
+          // transform: "scaleY(-1)",
         }}
         onClick={handleSvgClick}
       >

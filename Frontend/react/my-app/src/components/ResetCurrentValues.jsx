@@ -22,6 +22,7 @@ const ResetCurrentValues = ({ messageBoxRef }) => {
     isMoving: false,
     distanceTraveled: 0.0,
     distanceRemaining: 0.0,
+    isMoving: false,
     debug_note: "System initialized"
   };
 

@@ -13,6 +13,9 @@ const GridMap = ({
   onRevertObstacles,
   onObstacleCountChange,
   onUnsavedChangesChange,
+  revertPathRef,
+  onHasUnsavedPathChanges,
+  onPathPointClick, // NEW: Callback for when a valid path point is clicked
 }) => {
   const [gridData, setGridData] = useState([]);
   const [obstacles, setObstacles] = useState([]); // Last saved/imported state
@@ -53,7 +56,7 @@ const GridMap = ({
           row: point.row,
           col: point.col,
           x: point.x,
-          y: point.y,
+          y: imgDimensions.height - point.y,
           r: point.row,
           c: point.col
         }));
@@ -63,20 +66,28 @@ const GridMap = ({
       }
     };
     fetchGrid();
-  }, []);
-
-  // DO NOT fetch obstacles automatically on startup anymore
-  // Obstacles will only be loaded when user clicks "Import Obstacles"
+  }, [imgDimensions.height]);
 
   const isObstacle = (r, c) => {
-    // Check multiple possible property names for flexibility
     const found = unsavedObstacles.some((obs) => {
-      // Try different possible property names
       const obsR = obs.r !== undefined ? obs.r : obs.row;
       const obsC = obs.c !== undefined ? obs.c : obs.col;
       return obsR === r && obsC === c;
     });
     return found;
+  };
+
+  // NEW: Validate if a point can be clicked for path mode
+  const validatePathClick = (r, c) => {
+    if (isObstacle(r, c)) {
+      return {
+        valid: false,
+        reason: 'obstacle',
+        message: 'Cannot click on obstacle point'
+      };
+    }
+    
+    return { valid: true };
   };
 
   // Get the pixel coordinates for a grid point
@@ -93,10 +104,8 @@ const GridMap = ({
     const maxR = Math.max(...gridData.map(p => p.r));
     const maxC = Math.max(...gridData.map(p => p.c));
 
-    // Check each grid cell
     for (let r = 0; r < maxR; r++) {
       for (let c = 0; c < maxC; c++) {
-        // Check the 4 corners of this cell
         const corners = [
           { r, c, pos: getGridPointCoords(r, c) },
           { r, c: c + 1, pos: getGridPointCoords(r, c + 1) },
@@ -104,13 +113,11 @@ const GridMap = ({
           { r: r + 1, c, pos: getGridPointCoords(r + 1, c) }
         ];
 
-        // Filter corners that are obstacles and have valid coordinates
         const obstacleCorners = corners.filter(
           corner => corner.pos && isObstacle(corner.r, corner.c)
         );
 
         if (obstacleCorners.length >= 3) {
-          // Create polygon from obstacle corners
           const points = obstacleCorners
             .map(corner => `${corner.pos.x},${corner.pos.y}`)
             .join(' ');
@@ -131,7 +138,6 @@ const GridMap = ({
 
   // Handle clicks on the SVG container
   const handleSvgClick = (e) => {
-    if (mode !== "obstacle") return;
     if (gridData.length === 0) return;
 
     const svg = svgRef.current;
@@ -142,7 +148,7 @@ const GridMap = ({
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
 
-    // Convert to SVG coordinates (accounting for viewBox)
+    // Convert to SVG coordinates
     const svgX = (clickX / rect.width) * imgDimensions.width;
     const svgY = (clickY / rect.height) * imgDimensions.height;
 
@@ -162,15 +168,46 @@ const GridMap = ({
     });
 
     if (closestPoint) {
-      handlePointClick(closestPoint);
+      handlePointClick(closestPoint, e);
     }
   };
 
-  // Handle adding/removing obstacles locally (no server call)
-  const handlePointClick = (point) => {
+  // Handle point clicks - with validation for path mode
+  const handlePointClick = (point, e) => {
+    const { r, c } = point;
+    
+    // NEW: Validate path mode clicks
+    if (mode === 'path') {
+      const validation = validatePathClick(r, c);
+      if (!validation.valid) {
+        // Prevent the event from bubbling to ClickToPath
+        if (e) {
+          e.stopPropagation();
+        }
+        
+        if (messageBoxRef?.current) {
+          messageBoxRef.current.addMessage('error', validation.message);
+        }
+        console.warn(`⛔ Invalid click at (${r}, ${c}): ${validation.message}`);
+        return;
+      }
+      
+      // Valid path click - notify parent component
+      console.log(`✅ Valid path click at (${r}, ${c})`);
+      if (messageBoxRef?.current) {
+        messageBoxRef.current.addMessage('success', `Path point selected at (${r}, ${c})`);
+      }
+      
+      // Call the parent's callback if provided
+      if (onPathPointClick) {
+        onPathPointClick(point);
+      }
+      return;
+    }
+    
+    // Obstacle mode logic
     if (mode !== "obstacle") return;
 
-    const { r, c } = point;
     let updatedObstacles;
     let added = true;
 
@@ -207,10 +244,8 @@ const GridMap = ({
       const json = await response.json();
       console.log("Raw JSON response:", json);
       
-      // Handle both {data: [...]} or direct array format
       let obstaclesData = json.data || json || [];
       
-      // Normalize the data format to ensure {r, c} properties
       obstaclesData = obstaclesData.map(obs => ({
         r: obs.r !== undefined ? obs.r : obs.row,
         c: obs.c !== undefined ? obs.c : obs.col
@@ -218,15 +253,11 @@ const GridMap = ({
       
       console.log("Normalized obstacles data:", obstaclesData);
       console.log("Number of obstacles:", obstaclesData.length);
-      console.log("First obstacle (if any):", obstaclesData[0]);
       
       setObstacles(obstaclesData);
       setUnsavedObstacles(obstaclesData);
       setHasUnsavedChanges(false);
       
-      console.log("State updated!");
-      console.log("obstacles state:", obstaclesData);
-      console.log("unsavedObstacles state:", obstaclesData);
       console.log("=== IMPORT OBSTACLES COMPLETED ===");
       
       if (messageBoxRef?.current) {
@@ -260,7 +291,6 @@ const GridMap = ({
       const result = await response.json();
       console.log("Obstacles exported:", result);
       
-      // Update the saved obstacles state
       setObstacles(unsavedObstacles);
       setHasUnsavedChanges(false);
       
@@ -341,7 +371,6 @@ const GridMap = ({
         position: "relative",
         display: "inline-block",
         width: "100%",
-        maxWidth: "1049px",
       }}
     >
       {image && (
@@ -366,7 +395,8 @@ const GridMap = ({
           position: "absolute",
           top: 0,
           left: 0,
-          cursor: mode === "obstacle" ? "pointer" : "default",
+          cursor: mode === "obstacle" ? "pointer" : "crosshair",
+          pointerEvents: "auto", // Allow SVG to receive events
         }}
         onClick={handleSvgClick}
       >
@@ -456,8 +486,8 @@ const GridMap = ({
             />
           );
         })}
-        </svg>
-      </div>
+      </svg>
+    </div>
   );
 };
 

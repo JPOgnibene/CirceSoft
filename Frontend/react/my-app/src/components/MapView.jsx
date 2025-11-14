@@ -15,7 +15,10 @@ export default function MapView({
   setObstacleCount,
   setHasUnsavedObstacleChanges,
   exportPathRef,
-  clearPathRef
+  clearPathRef,
+  revertPathRef,
+  setHasUnsavedPathChanges,
+  hasUnsavedPathChanges
 }) {
   const [imgDimensions, setImgDimensions] = useState({ width: 0, height: 0 });
   const [image, setBackgroundImg] = useState(null);
@@ -53,8 +56,8 @@ export default function MapView({
   return (
     <div
       style={{
-        width: `${fieldWidth}px`,
-        height: `${fieldHeight}px`,
+        width: "100%",
+
         overflow: "hidden",
         border: "none",
         margin: 0,
@@ -71,11 +74,14 @@ export default function MapView({
         doubleClick={{ disabled: true }}
       >
         {({ state }) => (
-          <TransformComponent>
+          <TransformComponent
+            wrapperStyle={{ width: "100%", height: "100%" }}
+            contentStyle={{ width: "100%", height: "100%" }}
+          >
             <div
               style={{
-                width: `${fieldWidth}px`,
-                height: `${fieldHeight}px`,
+                width: "100%",
+                // height: `${fieldHeight}px`,
                 position: "relative"
               }}
             >
@@ -96,6 +102,9 @@ export default function MapView({
                 setHasUnsavedObstacleChanges={setHasUnsavedObstacleChanges}
                 exportPathRef={exportPathRef}
                 clearPathRef={clearPathRef}
+                revertPathRef={revertPathRef}
+                setHasUnsavedPathChanges={setHasUnsavedPathChanges}
+                hasUnsavedPathChanges={hasUnsavedPathChanges}
               />
             </div>
           </TransformComponent>

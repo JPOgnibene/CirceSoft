@@ -5,10 +5,12 @@ import MapView from "./components/MapView";
 import Progress from "./components/Progress";
 import EmergencyStop from "./components/Stop";
 import StartCommand from "./components/Start";
-import SendToCirceBot from "./components/SendToCirceBot";
+import StartStopButton from './components/StartStop';
 import IsMovingStatus from "./components/BotMoving";
 import ImportPathIcon from './components/ImportPathIcon';
 import PathControls from './components/PathControls';
+import ResetCurrentValues from './components/ResetCurrentValues';
+import CurrentValuesDisplay from './components/CurrentValuesDisplay';
 import { WebSocketProvider, WebsocketStatusIcon, useWebSocket } from "./components/Websocket";
 import {
   PlayButtonIcon,
@@ -19,17 +21,20 @@ import {
 } from "./components/Icons";
 
 function AppContent({ messageBoxRef }) {
+  const [isBotRunning, setIsBotRunning] = useState(false);
   const [completionProgress, setValue] = useState(0);
   const [path, setPath] = useState([]);
   const [mode, setMode] = useState("path");
   const [obstacleCount, setObstacleCount] = useState(0);
   const [hasUnsavedObstacleChanges, setHasUnsavedObstacleChanges] = useState(false);
+  const [hasUnsavedPathChanges, setHasUnsavedPathChanges] = useState(false);
   
   // Refs for obstacle functions
   const importObstaclesRef = useRef(null); // ADD THIS LINE
   const exportObstaclesRef = useRef(null);
   const clearObstaclesRef = useRef(null);
   const revertObstaclesRef = useRef(null);
+  const revertPathRef = useRef(null);
   
   // Refs for path functions
   const exportPathRef = useRef(null);
@@ -39,11 +44,6 @@ function AppContent({ messageBoxRef }) {
   const ws = useWebSocket();
   const distanceTraveled = ws?.distanceTraveled || 0;
   const isMoving = ws?.isMoving || false;
-  
-  // Handler for imported path
-  const handlePathImported = (importedPath) => {
-    setPath(importedPath);
-  };
   
   // Calculate path length (same logic as in ClickToPath)
   const GRID_CELL_SIZE_FEET = 2;
@@ -71,6 +71,15 @@ function AppContent({ messageBoxRef }) {
   };
   
   const pathLength = calculatePathLength();
+
+    // Handler for imported path
+  const handlePathImported = (importedPath) => {
+    setPath(importedPath);
+    // Notify ClickToPath to set this as saved state
+    if (importPathRef.current) {
+      importPathRef.current(importedPath);
+    }
+  };
   
   // Handlers for PathControls
   const handleExportPath = () => {
@@ -109,6 +118,12 @@ function AppContent({ messageBoxRef }) {
       revertObstaclesRef.current();
     }
   };
+
+  const handleRevertPath = () => {
+    if (revertPathRef.current) {
+      revertPathRef.current();
+    }
+  };
   
   return (
     <div>
@@ -118,46 +133,17 @@ function AppContent({ messageBoxRef }) {
             <WebsocketStatusIcon messageBoxRef={messageBoxRef} />
           </div>
           <div className="clickIcon">
-            <ImportPathIcon messageBoxRef={messageBoxRef} onPathImported={handlePathImported}/>
-          </div>
-          <div className="clickIcon">
-            <PlayButtonIcon messageBoxRef={messageBoxRef} />
-          </div>
-          <div className="clickIcon">
-            <PauseButtonIcon messageBoxRef={messageBoxRef} />
-          </div>
-          <div className="clickIcon">
-            <WaypointIcon messageBoxRef={messageBoxRef} />
-          </div>
-          <div>
-            <EmergencyStop messageBoxRef={messageBoxRef} />
-          </div>
-          <div>
-            <StartCommand messageBoxRef={messageBoxRef} />
-          </div>
-          <div className="clickIcon">
-            <TargetIcon messageBoxRef={messageBoxRef} />
-          </div>
-          <div className="clickIcon">
             <IsMovingStatus messageBoxRef={messageBoxRef} />
           </div>
         </div>
-        <div className="progress-container">
-          <Progress/>
+        
+        <div className="header-title-container">
+          <h1 className="header-title">CirceSoft</h1>
         </div>
+        
         <div className="spacer"></div>
-        <label className="switch">
-          <input type="checkbox" id="websocket_on" />
-        </label>
-        <label className="switch">
-          <input type="checkbox" id="offpath" />
-        </label>
-        <div className="icon">
-          <OnPathIcon messageBoxRef={messageBoxRef} />
-        </div>
-        <div>
-          <SendToCirceBot path={path} />
-        </div>
+        <img className="logo2" src="/contents/images/devcomlogo2.png" alt="Devcom" />
+        <img className="logo1" src="/contents/images/devcomlogo.png" alt="Devcom" />
       </header>
       
       {/* Main Content Area */}
@@ -167,6 +153,7 @@ function AppContent({ messageBoxRef }) {
             mode={mode}
             setMode={setMode}
             path={path}
+            setPath={setPath}
             pathLength={pathLength}
             distanceTraveled={distanceTraveled}
             isMoving={isMoving}
@@ -178,6 +165,10 @@ function AppContent({ messageBoxRef }) {
             onExportObstacles={handleExportObstacles}
             onClearObstacles={handleClearObstacles}
             onRevertObstacles={handleRevertObstacles}
+            onRevertPath={handleRevertPath}
+            hasUnsavedPathChanges={hasUnsavedPathChanges}
+            onPathImported={handlePathImported}
+            messageBoxRef={messageBoxRef}
           />
           <MessageWindow ref={messageBoxRef} />
         </div>
@@ -196,7 +187,35 @@ function AppContent({ messageBoxRef }) {
             setHasUnsavedObstacleChanges={setHasUnsavedObstacleChanges}
             exportPathRef={exportPathRef}
             clearPathRef={clearPathRef}
+            revertPathRef={revertPathRef}
+            setHasUnsavedPathChanges={setHasUnsavedPathChanges} 
+            hasUnsavedPathChanges={hasUnsavedPathChanges}
           />
+
+          <div className="bottom-progress">
+            <Progress distanceTraveled={distanceTraveled} pathLength={pathLength} />
+          </div>
+          
+          <div className="bottom-controls-container">
+            <div className="start-stop-section">
+              <div style={{ flex: 1, transition: "flex 0.3s ease" }}>
+                <StartStopButton 
+                  messageBoxRef={messageBoxRef} 
+                  onRunningChange={setIsBotRunning}
+                />
+              </div>
+              <IsMovingStatus 
+                messageBoxRef={messageBoxRef} 
+                isVisible={isBotRunning}
+              />
+            </div>
+            <div className="reset-button-section">
+              <ResetCurrentValues messageBoxRef={messageBoxRef} />
+            </div>
+          </div>
+          <div>
+            <CurrentValuesDisplay messageBoxRef={messageBoxRef} />
+          </div>
         </div>
       </div>
     </div>

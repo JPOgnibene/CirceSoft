@@ -1,90 +1,68 @@
-// src/components/IsMovingStatus.jsx
-import React, { useEffect, useState, useRef } from "react";
-import { useWebSocket } from './Websocket'; // Adjust path as needed
+import React, { useEffect, useState } from "react";
+import { useWebSocket } from './Websocket';
 
-function IsMovingStatus({ messageBoxRef }) {
-  const [isMoving, setIsMoving] = useState(false);
-  const [error, setError] = useState(null);
-  const previousIsMoving = useRef(null); // Track previous state
+function IsMovingStatus({ messageBoxRef, isVisible }) {
   const ws = useWebSocket();
-
+  const [isMoving, setIsMoving] = useState(false);
+  
+  // Update local state when WebSocket values change
   useEffect(() => {
-    // Only proceed if WebSocket is available
-    if (!ws) {
-      console.warn('WebSocket not available in IsMovingStatus');
-      return;
+    if (ws) {
+      setIsMoving(ws.isMoving || false);
+      console.log('IsMovingStatus - Moving state:', ws.isMoving);
     }
+  }, [ws?.isMoving]);
 
-    // Store the original onMessage handler
-    const originalHandler = ws.wsClient?.onMessage;
-
-    // Create our custom handler that wraps the original
-    const handleWebSocketMessage = (message) => {
-      // Call the original handler first
-      if (originalHandler) {
-        originalHandler(message);
-      }
-
-      // Handle current_values_update messages
-      if (message.type === 'current_values_update' && message.data) {
-        // Check if isMoving field exists in the update
-        if ('isMoving' in message.data) {
-          const newIsMoving = message.data.isMoving === true;
-          
-          // Only update and show message if the value has changed
-          if (previousIsMoving.current !== null && previousIsMoving.current !== newIsMoving) {
-            if (messageBoxRef?.current) {
-              messageBoxRef.current.addMessage(
-                'info', 
-                `Bot is now ${newIsMoving ? "moving" : "stopped"}`
-              );
-            }
-          }
-          
-          // Update state and ref
-          setIsMoving(newIsMoving);
-          previousIsMoving.current = newIsMoving;
-          setError(null); // Clear any previous errors
-        }
-      }
-    };
-
-    // Replace the WebSocket handler
-    if (ws.wsClient) {
-      ws.wsClient.onMessage = handleWebSocketMessage;
-    }
-
-    // Cleanup: restore original handler on unmount
-    return () => {
-      if (ws.wsClient && originalHandler) {
-        ws.wsClient.onMessage = originalHandler;
-      }
-    };
-  }, [ws, messageBoxRef]);
-
-  // Simple visual indicator
   return (
     <div
       style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "6px",
-        padding: "4px 8px",
+        width: isVisible ? "225px" : "0",
+        opacity: isVisible ? 1 : 0,
+        overflow: "hidden",
+        transition: "width 0.3s ease, opacity 0.3s ease",
+        marginLeft: isVisible ? "8px" : "0",
+        flexShrink: 0,
       }}
     >
       <div
         style={{
-          width: "14px",
-          height: "14px",
-          borderRadius: "50%",
-          backgroundColor: isMoving ? "limegreen" : "red",
-          transition: "background-color 0.3s ease",
+          padding: "12px 16px",
+          backgroundColor: "rgba(15, 20, 30, 0.9)",
+          color: isMoving ? "#00ff9f" : "#6b7280",
+          border: isMoving
+            ? "1px solid rgba(0, 255, 159, 0.3)"
+            : "1px solid rgba(107, 114, 128, 0.3)",
+          borderRadius: "2px",
+          fontSize: "0.8rem",
+          fontWeight: "600",
+          letterSpacing: "0.5px",
+          fontFamily: "'Courier New', monospace",
+          textTransform: "uppercase",
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          whiteSpace: "nowrap",
+          height: "100%",
+          width: "225px",
         }}
-        title={isMoving ? "Moving" : "Stopped"}
-      ></div>
-      <span style={{ fontSize: "0.9rem", color: "#fff" }}>
-        {error ? "Error" : isMoving ? "Moving" : "Stopped"}
-      </span>
+      >
+        <div
+          style={{
+            width: "10px",
+            height: "10px",
+            borderRadius: "50%",
+            backgroundColor: isMoving ? "#00ff9f" : "#6b7280",
+            boxShadow: isMoving ? "0 0 10px rgba(0, 255, 159, 0.6)" : "none",
+            transition: "all 0.3s ease",
+          }}
+        />
+        <span>
+          BOT STATUS:{" "}
+          <span style={{ color: isMoving ? "#00ff9f" : "#ff4757", marginLeft: "6px" }}>
+            {isMoving ? "MOVING" : "STOPPED"}
+          </span>
+        </span>
+      </div>
     </div>
   );
 }

@@ -128,12 +128,29 @@ export const WebSocketProvider = ({ children, messageBoxRef }) => {
     if (!data) return 'No data';
 
     switch (type) {
-      case 'current_values_update':
-        // Display key-value pairs of current values
-        const values = Object.entries(data)
-          .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
-          .join(', ');
-        return values || 'Empty';
+      case 'current_values_update': {
+        const {
+          distanceTraveled = 0,
+          distanceRemaining = 0,
+          cableRemaining = 0,
+          percentBatteryRemaining = 0,
+          errorCode = 0,
+          cableDispenseStatus = false,
+          debug_note = ""
+        } = data;
+
+        const shortNote =
+          debug_note.length > 20 ? debug_note.slice(0, 20) + "..." : debug_note;
+
+        return (
+          `dist ${distanceTraveled.toFixed(1)}ft / ${distanceRemaining.toFixed(1)}ft, ` +
+          `cable ${cableRemaining.toFixed(0)}ft, ` +
+          `batt ${percentBatteryRemaining}%, ` +
+          `err ${errorCode}, ` +
+          `disp ${cableDispenseStatus ? "ON" : "OFF"}` +
+          (shortNote ? `, note: "${shortNote}"` : "")
+        );
+      }
 
       case 'path_update':
         // Display number of path points
@@ -191,7 +208,7 @@ export const WebSocketProvider = ({ children, messageBoxRef }) => {
     if (messageBoxRef?.current) {
       const messageType = message.type || 'unknown';
       const changes = formatChanges(messageType, message.data);
-      messageBoxRef.current.addMessage('ws', `${messageType}: ${changes}`);
+      //messageBoxRef.current.addMessage('ws', `${messageType}: ${changes}`);
     }
 
     // Handle different message types

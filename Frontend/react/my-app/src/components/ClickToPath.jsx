@@ -12,7 +12,7 @@ const ClickToPath = ({
   messageBoxRef,
   mode,
   setMode,
-  importObstaclesRef, // ADD THIS LINE
+  importObstaclesRef,
   exportObstaclesRef,
   clearObstaclesRef,
   revertObstaclesRef,
@@ -20,6 +20,9 @@ const ClickToPath = ({
   setHasUnsavedObstacleChanges,
   exportPathRef,
   clearPathRef,
+  revertPathRef,
+  setHasUnsavedPathChanges,
+  hasUnsavedPathChanges
 }) => {
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 800, height: 600 });
@@ -27,18 +30,23 @@ const ClickToPath = ({
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragPosition, setDragPosition] = useState(null);
+
+  const [savedPath, setSavedPath] = useState([]);
+  const [unsavedPath, setUnsavedPath] = useState([]);
   
-  // Get WebSocket data - store in local state to ensure re-renders
   const ws = useWebSocket();
   const [distanceTraveled, setDistanceTraveled] = useState(0);
   const [isMoving, setIsMoving] = useState(false);
 
-  // Animation variables
   const [animatedDistance, setAnimatedDistance] = useState(0);
   const animationFrameRef = useRef(null);
   const lastUpdateTimeRef = useRef(Date.now());
   
-  // Update local state when WebSocket values change
+  // CONFIGURATION
+  const MAX_PATH_LENGTH_FEET = 300;
+  const CELL_WIDTH_FT = 7.5;
+  const CELL_HEIGHT_FT = 5.16;
+  
   useEffect(() => {
     if (ws) {
       setDistanceTraveled(ws.distanceTraveled || 0);
@@ -47,7 +55,6 @@ const ClickToPath = ({
     }
   }, [ws?.distanceTraveled, ws?.isMoving]);
 
-  // Animation loop for smooth movement
   useEffect(() => {
     const animate = () => {
       const now = Date.now();
@@ -79,16 +86,11 @@ const ClickToPath = ({
     };
   }, [distanceTraveled]);
 
-  
   const transformContext = useTransformContext();
   const scale = transformContext?.state?.scale ?? 1;
   const PATH_ENDPOINT = "http://localhost:8765/grid/path";
   const WAYPOINT_ENDPOINT = "http://localhost:8765/waypoints";
   
-  // CONFIGURATION: Real-world size of one grid cell
-  const GRID_CELL_SIZE_FEET = 2;
-  const CELL_WIDTH_FT = 7.5;
-  const CELL_HEIGHT_FT = 5.16;
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -100,7 +102,7 @@ const ClickToPath = ({
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
   }, []);
-  // Calculate Euclidean distance between two points in grid coordinates
+
   const calculateDistance = (point1, point2) => {
     const dx = point2.x - point1.x;
     const dy = point2.y - point1.y;
@@ -108,18 +110,16 @@ const ClickToPath = ({
     const dy_feet = dy * CELL_HEIGHT_FT;
     return Math.sqrt(dx_feet * dx_feet + dy_feet * dy_feet);
   };
-  // Calculate total path length in grid units and real-world units
-  const calculatePathLength = () => {
-    if (path.length < 2) {
+
+  const calculatePathLength = (pathArray = path) => {
+    if (pathArray.length < 2) {
       return { gridUnits: 0, feet: 0, meters: 0 };
     }
     let totalDistance = 0;
-    for (let i = 0; i < path.length - 1; i++) {
-      totalDistance += calculateDistance(path[i], path[i + 1]);
+    for (let i = 0; i < pathArray.length - 1; i++) {
+      totalDistance += calculateDistance(pathArray[i], pathArray[i + 1]);
     }
-    //const distanceFeet = totalDistance * GRID_CELL_SIZE_FEET;
     const distanceFeet = totalDistance;
-    console.log("calculatePathLength - Total Distance (grid units):", totalDistance, "Feet:", distanceFeet);
     const distanceMeters = distanceFeet * 0.3048;
     return {
       gridUnits: totalDistance,
@@ -127,7 +127,26 @@ const ClickToPath = ({
       meters: distanceMeters
     };
   };
-  // Export path to server
+
+  // NEW: Check if adding a new point would exceed the max length
+  const wouldExceedMaxLength = (newPoint) => {
+    if (path.length === 0) return false;
+    
+    const testPath = [...path, newPoint];
+    const testLength = calculatePathLength(testPath);
+    
+    return testLength.feet > MAX_PATH_LENGTH_FEET;
+  };
+
+  // NEW: Check if moving a point would exceed the max length
+  const wouldMovingExceedMaxLength = (index, newPoint) => {
+    const testPath = [...path];
+    testPath[index] = newPoint;
+    const testLength = calculatePathLength(testPath);
+    
+    return testLength.feet > MAX_PATH_LENGTH_FEET;
+  };
+
   const exportPath = async () => {
     if (path.length === 0) {
       if (messageBoxRef?.current) {
@@ -157,7 +176,9 @@ const ClickToPath = ({
       
       const result = await response.json();
       console.log("Path exported:", result);
-      console.log("Path length:", pathLength);
+      
+      setSavedPath(path);
+      setHasUnsavedPathChanges(false);
       
       if (messageBoxRef?.current) {
         messageBoxRef.current.addMessage(
@@ -173,25 +194,61 @@ const ClickToPath = ({
       }
     }
   };
-  // Clear current path
-  const clearPath = () => {
-    setPath([]);
+
+  const revertPath = () => {
+    setPath(savedPath);
+    setUnsavedPath(savedPath);
+    setHasUnsavedPathChanges(false);
     if (messageBoxRef?.current) {
-      messageBoxRef.current.addMessage('info', 'Path cleared');
+      messageBoxRef.current.addMessage('info', 'Path changes reverted to last saved state');
     }
   };
-  // Expose path functions via refs
+
+  const clearPath = () => {
+    setPath([]);
+    setUnsavedPath([]);
+    setHasUnsavedPathChanges(true);
+    if (messageBoxRef?.current) {
+      messageBoxRef.current.addMessage('info', 'Path cleared - not saved');
+    }
+  };
+
   useEffect(() => {
     if (exportPathRef) {
       exportPathRef.current = exportPath;
     }
   }, [path, exportPathRef]);
+
   useEffect(() => {
     if (clearPathRef) {
       clearPathRef.current = clearPath;
     }
   }, [clearPathRef]);
-  // Delete a specific point
+
+  useEffect(() => {
+    setUnsavedPath(path);
+  }, [path]);
+
+  useEffect(() => {
+    if (revertPathRef) {
+      revertPathRef.current = revertPath;
+    }
+  }, [savedPath, unsavedPath, hasUnsavedPathChanges, revertPathRef]);
+
+  useEffect(() => {
+    if (JSON.stringify(path) !== JSON.stringify(savedPath)) {
+      setHasUnsavedPathChanges(true);
+    } else {
+      setHasUnsavedPathChanges(false);
+    }
+  }, [path, savedPath]);
+
+  useEffect(() => {
+    if (setHasUnsavedPathChanges) {
+      setHasUnsavedPathChanges(hasUnsavedPathChanges);
+    }
+  }, [hasUnsavedPathChanges, setHasUnsavedPathChanges]);
+
   const deletePoint = (index) => {
     const deletedPoint = path[index];
     setPath(path.filter((_, i) => i !== index));
@@ -199,14 +256,14 @@ const ClickToPath = ({
       messageBoxRef.current.addMessage('info', `Waypoint removed at (${deletedPoint.x}, ${deletedPoint.y})`);
     }
   };
-  // Handle mouse down on path point (start drag)
+
   const handlePointMouseDown = (e, index) => {
     if (mode !== "path") return;
     e.stopPropagation();
     setDraggedIndex(index);
     setIsDragging(true);
   };
-  // Handle mouse move (dragging)
+
   const handleMouseMove = (e) => {
     if (!isDragging || draggedIndex === null || mode !== "path" || !gridBounds) return;
     const rect = containerRef.current.getBoundingClientRect();
@@ -228,14 +285,24 @@ const ClickToPath = ({
     const pyFlipped = imgDimensions.height - py;
     const yCoord = ((pyFlipped - gridBounds.minPY) / (gridBounds.maxPY - gridBounds.minPY)) * gridBounds.maxRows;
     
-    const newPath = [...path];
-    newPath[draggedIndex] = {
+    const newPoint = {
       x: Math.round(xCoord),
       y: Math.round(yCoord)
     };
+
+    // NEW: Check if moving this point would exceed max length
+    if (wouldMovingExceedMaxLength(draggedIndex, newPoint)) {
+      if (messageBoxRef?.current) {
+        messageBoxRef.current.addMessage('warning', `Cannot move: Path would exceed ${MAX_PATH_LENGTH_FEET} ft limit`);
+      }
+      return;
+    }
+    
+    const newPath = [...path];
+    newPath[draggedIndex] = newPoint;
     setPath(newPath);
   };
-  // Handle mouse up (end drag)
+
   const handleMouseUp = () => {
     if (isDragging && draggedIndex !== null) {
       const movedPoint = path[draggedIndex];
@@ -251,6 +318,7 @@ const ClickToPath = ({
     
     setDragPosition(null);
   };
+
   useEffect(() => {
     if (isDragging) {
       const moveHandler = (e) => handleMouseMove(e);
@@ -264,6 +332,7 @@ const ClickToPath = ({
       };
     }
   }, [isDragging, draggedIndex, gridBounds, imgDimensions, dragPosition]);
+
   const handleClick = (e) => {
     if (mode !== "path" || isDragging) return;
     
@@ -292,15 +361,31 @@ const ClickToPath = ({
     const pyFlipped = imgDimensions.height - py;
     const yCoord = ((pyFlipped - gridBounds.minPY) / (gridBounds.maxPY - gridBounds.minPY)) * gridBounds.maxRows;
     
+    const newPoint = { 
+      x: Math.round(xCoord), 
+      y: Math.round(yCoord)
+    };
+
+    // NEW: Check if adding this point would exceed max length
+    if (wouldExceedMaxLength(newPoint)) {
+      const currentLength = calculatePathLength();
+      if (messageBoxRef?.current) {
+        messageBoxRef.current.addMessage(
+          'error', 
+          `Cannot add waypoint: Path would exceed ${MAX_PATH_LENGTH_FEET} ft limit. Current: ${currentLength.feet.toFixed(2)} ft`
+        );
+      }
+      console.warn(`⛔ Path length limit exceeded: Would be > ${MAX_PATH_LENGTH_FEET} ft`);
+      return;
+    }
+
     console.log("Path set at (", xCoord, ", ", yCoord, ")");
     if (messageBoxRef?.current) {
       messageBoxRef.current.addMessage('success', `Waypoint added at (${Math.round(xCoord)}, ${Math.round(yCoord)})`);
     }
-    setPath((p) => [...p, { 
-      x: Math.round(xCoord), 
-      y: Math.round(yCoord)
-    }]);
+    setPath((p) => [...p, newPoint]);
   };
+
   const graphToPixel = (dot) => {
     const { width, height } = size;
     
@@ -315,7 +400,7 @@ const ClickToPath = ({
     const py = ((imgDimensions.height - imgY) / imgDimensions.height) * height;
     return { px, py };
   };
-  // Calculate position based on distance traveled (in feet)
+
   const getPositionFromDistance = () => {
     if (path.length === 0) return { x: 0, y: 0, index: 0 };
     if (path.length === 1) return { ...path[0], index: 0 };
@@ -338,8 +423,6 @@ const ClickToPath = ({
     
     const clampedDistance = Math.min(Math.max(0, animatedDistance), cumulativeDistance);
     
-    //console.log('getPositionFromDistance - Distance:', distanceTraveled, 'Clamped:', clampedDistance, 'Total:', cumulativeDistance);
-    
     for (let i = 0; i < segmentDistances.length; i++) {
       const segment = segmentDistances[i];
       if (clampedDistance >= segment.start && clampedDistance <= segment.end) {
@@ -352,7 +435,6 @@ const ClickToPath = ({
           index: segment.index,
         };
         
-        //console.log('Position calculated:', position, 'Segment:', i, 't:', t);
         return position;
       }
     }
@@ -360,6 +442,7 @@ const ClickToPath = ({
     console.log('At end of path');
     return { ...path[path.length - 1], index: path.length - 1 };
   };
+
   const currentDot = getPositionFromDistance();
   const { px, py } = graphToPixel(currentDot);
   let completed = [];
@@ -369,16 +452,21 @@ const ClickToPath = ({
     completed.push({ x: currentDot.x, y: currentDot.y });
     remaining = [{ x: currentDot.x, y: currentDot.y }, ...path.slice(currentDot.index + 1)];
   }
+
   return (
     <div
       style={{
         position: "relative",
-        width: `${imgDimensions.width}px`,
-        height: `${imgDimensions.height}px`,
+        width: "100%",
+        paddingBottom: `${(imgDimensions.height / imgDimensions.width) * 100}%`,
+        height: 0,
       }}
     >
       <div
         style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
           width: "100%",
           height: "100%",
         }}
@@ -402,7 +490,6 @@ const ClickToPath = ({
           onUnsavedChangesChange={setHasUnsavedObstacleChanges}
         />
         
-        {/* === PATH DRAWING === */}
         <svg
           style={{
             position: "absolute",
@@ -459,7 +546,6 @@ const ClickToPath = ({
           )}
         </svg>
         
-        {/* Draw clicked path dots */}
         {path.map((dot, index) => {
           const { px, py } = graphToPixel(dot);
           return (
@@ -518,7 +604,6 @@ const ClickToPath = ({
           );
         })}
         
-        {/* Moving icon */}
         <img
           src="/contents/images/circe.png"
           alt="moving"

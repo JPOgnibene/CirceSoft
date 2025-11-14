@@ -86,7 +86,7 @@ const ResetCurrentValues = ({ messageBoxRef }) => {
         disabled={isResetting}
         style={buttonStyle}
       >
-        {isResetting ? "⏳ RESETTING..." : "🔄 RESET DATA"}
+        {isResetting ? "RESETTING..." : "RESET DATA"}
       </button>
     </div>
   );

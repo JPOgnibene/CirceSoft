@@ -243,3 +243,17 @@
   .bottom-progress {
     margin-top: 8px;
   }
+  .start-stop-section button,
+    .reset-button-section button {
+      height: 100%;      /* match their container height */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Ensure the parent containers stretch to the same height */
+    .start-stop-section,
+    .reset-button-section {
+      display: flex;
+      align-items: stretch;   /* critical */
+    }

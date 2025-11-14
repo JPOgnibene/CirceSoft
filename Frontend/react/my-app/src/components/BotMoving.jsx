@@ -16,11 +16,12 @@ function IsMovingStatus({ messageBoxRef, isVisible }) {
   return (
     <div
       style={{
-        maxWidth: isVisible ? "300px" : "0",
+        width: isVisible ? "225px" : "0",
         opacity: isVisible ? 1 : 0,
         overflow: "hidden",
-        transition: "max-width 0.3s ease, opacity 0.3s ease",
+        transition: "width 0.3s ease, opacity 0.3s ease",
         marginLeft: isVisible ? "8px" : "0",
+        flexShrink: 0,
       }}
     >
       <div
@@ -41,7 +42,8 @@ function IsMovingStatus({ messageBoxRef, isVisible }) {
           alignItems: "center",
           gap: "10px",
           whiteSpace: "nowrap",
-          minWidth: "200px",
+          height: "100%",
+          width: "225px",
         }}
       >
         <div

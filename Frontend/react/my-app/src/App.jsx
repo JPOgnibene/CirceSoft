@@ -9,6 +9,8 @@ import StartStopButton from './components/StartStop';
 import IsMovingStatus from "./components/BotMoving";
 import ImportPathIcon from './components/ImportPathIcon';
 import PathControls from './components/PathControls';
+import ResetCurrentValues from './components/ResetCurrentValues';
+import CurrentValuesDisplay from './components/CurrentValuesDisplay';
 import { WebSocketProvider, WebsocketStatusIcon, useWebSocket } from "./components/Websocket";
 import {
   PlayButtonIcon,
@@ -221,17 +223,26 @@ function AppContent({ messageBoxRef }) {
           <div className="bottom-progress">
             <Progress distanceTraveled={distanceTraveled} pathLength={pathLength} />
           </div>
-          <div style={{ display: "flex", marginTop: "8px" }}>
-            <div style={{ flex: isBotRunning ? "0 0 50%" : "1 1 100%", transition: "flex 0.3s ease" }}>
-              <StartStopButton 
+          
+          <div className="bottom-controls-container">
+            <div className="start-stop-section">
+              <div style={{ flex: 1, transition: "flex 0.3s ease" }}>
+                <StartStopButton 
+                  messageBoxRef={messageBoxRef} 
+                  onRunningChange={setIsBotRunning}
+                />
+              </div>
+              <IsMovingStatus 
                 messageBoxRef={messageBoxRef} 
-                onRunningChange={setIsBotRunning}
+                isVisible={isBotRunning}
               />
             </div>
-            <IsMovingStatus 
-              messageBoxRef={messageBoxRef} 
-              isVisible={isBotRunning}
-            />
+            <div className="reset-button-section">
+              <ResetCurrentValues messageBoxRef={messageBoxRef} />
+            </div>
+          </div>
+          <div>
+            <CurrentValuesDisplay messageBoxRef={messageBoxRef} />
           </div>
         </div>
       </div>

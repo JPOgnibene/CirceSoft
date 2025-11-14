@@ -180,3 +180,28 @@
     width: auto;
     margin-left: 16px;
   }
+
+
+    .bottom-controls-container {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    align-items: stretch;
+  }
+
+  .start-stop-section {
+    flex: 1;
+    display: flex;
+    min-width: 0;
+  }
+
+  .reset-button-section {
+    flex: 0 0 auto;
+    min-width: 200px;
+    max-width: 250px;
+  }
+
+  /* Update the bottom-progress if needed */
+  .bottom-progress {
+    margin-top: 8px;
+  }

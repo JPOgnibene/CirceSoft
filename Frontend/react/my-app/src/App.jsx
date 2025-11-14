@@ -132,44 +132,16 @@ function AppContent({ messageBoxRef }) {
           <div className="icon">
             <WebsocketStatusIcon messageBoxRef={messageBoxRef} />
           </div>
-          {/* <div className="clickIcon">
-            <ImportPathIcon messageBoxRef={messageBoxRef} onPathImported={handlePathImported}/>
-          </div> */}
-          {/* <div className="clickIcon">
-            <PlayButtonIcon messageBoxRef={messageBoxRef} />
-          </div>
-          <div className="clickIcon">
-            <PauseButtonIcon messageBoxRef={messageBoxRef} />
-          </div>
-          <div className="clickIcon">
-            <WaypointIcon messageBoxRef={messageBoxRef} />
-          </div> */}
-          {/* <div>
-            <EmergencyStop messageBoxRef={messageBoxRef} />
-          </div>
-          <div>
-            <StartCommand messageBoxRef={messageBoxRef} />
-          </div> */}
-          {/* <div>
-            <StartStopButton messageBoxRef={messageBoxRef} />
-          </div> */}
-          {/* <div className="clickIcon">
-            <TargetIcon messageBoxRef={messageBoxRef} />
-          </div> */}
           <div className="clickIcon">
             <IsMovingStatus messageBoxRef={messageBoxRef} />
           </div>
         </div>
-        {/* <div className="progress-container">
-          <Progress/>
-        </div> */}
+        
+        <div className="header-title-container">
+          <h1 className="header-title">CirceSoft</h1>
+        </div>
+        
         <div className="spacer"></div>
-        {/* <div className="icon">
-          <OnPathIcon messageBoxRef={messageBoxRef} />
-        </div> */}
-        {/* <div>
-          <SendToCirceBot path={path} />
-        </div> */}
         <img className="logo2" src="/contents/images/devcomlogo2.png" alt="Devcom" />
         <img className="logo1" src="/contents/images/devcomlogo.png" alt="Devcom" />
       </header>

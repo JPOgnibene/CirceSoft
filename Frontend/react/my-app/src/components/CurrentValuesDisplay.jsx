@@ -62,8 +62,8 @@ const CurrentValuesDisplay = ({ messageBoxRef }) => {
 
   const gridStyle = {
     display: "grid",
-    gridTemplateColumns: "repeat(6, 1fr)",
-    gap: "6px 10px",
+    gridTemplateColumns: "repeat(8, 1fr)",
+    gap: "6px 2px",
     alignItems: "center",
   };
 

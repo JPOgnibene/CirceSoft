@@ -28,6 +28,7 @@ function AppContent({ messageBoxRef }) {
   const [obstacleCount, setObstacleCount] = useState(0);
   const [hasUnsavedObstacleChanges, setHasUnsavedObstacleChanges] = useState(false);
   const [hasUnsavedPathChanges, setHasUnsavedPathChanges] = useState(false);
+  const [isPathComplete, setIsPathComplete] = useState(false);
   
   // Refs for obstacle functions
   const importObstaclesRef = useRef(null); // ADD THIS LINE
@@ -71,6 +72,17 @@ function AppContent({ messageBoxRef }) {
   };
   
   const pathLength = calculatePathLength();
+
+  React.useEffect(() => {
+  const progressPercentage = pathLength.feet > 0 
+    ? Math.min((distanceTraveled / pathLength.feet) * 100, 100)
+    : 0;
+  
+  if (progressPercentage >= 100 && isBotRunning) {
+    setIsPathComplete(true);
+    setIsBotRunning(false);
+  }
+}, [distanceTraveled, pathLength.feet, isBotRunning]);
 
     // Handler for imported path
   const handlePathImported = (importedPath) => {
@@ -202,6 +214,8 @@ function AppContent({ messageBoxRef }) {
                 <StartStopButton 
                   messageBoxRef={messageBoxRef} 
                   onRunningChange={setIsBotRunning}
+                  isPathComplete={isPathComplete}
+                  setIsPathComplete={setIsPathComplete}
                 />
               </div>
               <IsMovingStatus 
@@ -210,7 +224,10 @@ function AppContent({ messageBoxRef }) {
               />
             </div>
             <div className="reset-button-section">
-              <ResetCurrentValues messageBoxRef={messageBoxRef} />
+              <ResetCurrentValues 
+                messageBoxRef={messageBoxRef}
+                onReset={() => setIsPathComplete(false)}
+              />
             </div>
           </div>
           <div>

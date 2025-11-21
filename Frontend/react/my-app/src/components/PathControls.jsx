@@ -273,13 +273,13 @@ const PathControls = ({
           onClick={() => toggleMode("path")}
           style={modeButtonStyle(mode === "path", "#00ff9f")}
         >
-          ◉ PATH MODE
+          ◉ EDIT PATH
         </button>
         <button
           onClick={() => toggleMode("obstacle")}
           style={modeButtonStyle(mode === "obstacle", "#ff4757")}
         >
-          ▲ OBSTACLE MODE
+          ▲ EDIT OBSTACLES
         </button>
       </div>
 
@@ -295,7 +295,7 @@ const PathControls = ({
         }}
       >
         <div
-          style={{
+         style={{
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
             gap: "12px",
@@ -303,7 +303,7 @@ const PathControls = ({
             width: "100%",
           }}
         >
-          <button
+          {/* <button
             onClick={handleImportPath}
             style={{
               ...actionButtonStyle(true, "#00ff9f", "rgba(0, 255, 159, 0.2)"),
@@ -357,18 +357,10 @@ const PathControls = ({
                 }}
               />
             )}
-          </button>
-        </div>
+          </button> */}
+
         {/* Button grid - 3 BUTTONS */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "12px",
-            marginBottom: "12px",
-            width: "100%",
-          }}
-        >
+
           
           <button
             onClick={onClearPath}
@@ -494,7 +486,7 @@ const PathControls = ({
             width: "100%",
           }}
         >
-          <button
+          {/* <button
             onClick={onImportObstacles}
             style={actionButtonStyle(true, "#00ff9f", "rgba(0, 255, 159, 0.2)")}
           >
@@ -529,7 +521,7 @@ const PathControls = ({
                 }}
               />
             )}
-          </button>
+          </button> */}
 
           <button
             onClick={onClearObstacles}

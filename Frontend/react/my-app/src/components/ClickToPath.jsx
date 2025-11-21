@@ -614,7 +614,9 @@ const ClickToPath = ({
             width: 32 * scale,
             height: 32 * scale,
             pointerEvents: "none",
-            filter: isMoving ? "none" : "grayscale(0.5) opacity(0.7)",
+            filter: isMoving 
+              ? "drop-shadow(0 0 8px rgba(0, 255, 157, 1)) drop-shadow(0 0 16px rgba(0, 255, 159, 0.4))" 
+              : "grayscale(0.5) drop-shadow(0 0 6px rgba(255, 81, 0, 1))",
             transition: "filter 0.3s ease-in-out",
           }}
         />

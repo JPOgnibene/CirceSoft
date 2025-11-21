@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-const ResetCurrentValues = ({ messageBoxRef }) => {
+const ResetCurrentValues = ({ messageBoxRef, onReset }) => {
   const CURRENT_VALUES_ENDPOINT = "http://localhost:8765/current-values";
   const [isResetting, setIsResetting] = useState(false);
 
@@ -22,7 +22,6 @@ const ResetCurrentValues = ({ messageBoxRef }) => {
     isMoving: false,
     distanceTraveled: 0.0,
     distanceRemaining: 0.0,
-    isMoving: false,
     debug_note: "System initialized"
   };
 
@@ -46,6 +45,11 @@ const ResetCurrentValues = ({ messageBoxRef }) => {
       if (messageBoxRef?.current) {
         messageBoxRef.current.addMessage('success', 'Current values reset to default state');
       }
+
+      // Call the onReset callback to reset path completion state
+      if (onReset) {
+        onReset();
+      }
     } catch (error) {
       console.error("Failed to reset current values:", error);
       if (messageBoxRef?.current) {
@@ -53,6 +57,24 @@ const ResetCurrentValues = ({ messageBoxRef }) => {
       }
     } finally {
       setIsResetting(false);
+    }
+
+    // put to the the directions endpoint - send RESET command
+    try {
+      const response = await fetch("http://localhost:8765/directions", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command: "RESET" }),
+      });
+
+      if (!response.ok) { 
+        throw new Error(`Server error: ${response.status}`); 
+      }
+
+      const result = await response.json();
+      console.log("RESET command sent to directions endpoint:", result);
+    } catch (error) {
+      console.error("Error sending RESET command to directions endpoint:", error);
     }
   };
 

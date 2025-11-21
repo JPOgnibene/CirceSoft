@@ -273,13 +273,13 @@ const PathControls = ({
           onClick={() => toggleMode("path")}
           style={modeButtonStyle(mode === "path", "#00ff9f")}
         >
-          ◉ PATH MODE
+          ◉ EDIT PATH
         </button>
         <button
           onClick={() => toggleMode("obstacle")}
           style={modeButtonStyle(mode === "obstacle", "#ff4757")}
         >
-          ▲ OBSTACLE MODE
+          ▲ EDIT OBSTACLES
         </button>
       </div>
 

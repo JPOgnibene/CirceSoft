@@ -64,7 +64,7 @@ const ResetCurrentValues = ({ messageBoxRef, onReset }) => {
       const response = await fetch("http://localhost:8765/directions", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ command: "STOP" }),
+        body: JSON.stringify({ command: "RESET" }),
       });
 
       if (!response.ok) { 

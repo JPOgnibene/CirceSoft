@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-CirceBot Simulator (HTTP polling, auto-reset, sends STOP to /directions on completion)
+CirceBot Simulator (HTTP polling, auto-reset, sends STOP to /directions on completion or RESET)
 
 Endpoints:
-  GET  http://localhost:8765/directions      -> "START"/"STOP" or {"directions"|"command": "..."}
+  GET  http://localhost:8765/directions      -> "START"/"STOP"/"RESET" or {"directions"|"command": "..."}
   GET  http://localhost:8765/grid/path       -> bare list OR {"data":[{"r","c"}, ...]}
   PUT  http://localhost:8765/current-values  -> status JSON
-  PUT  http://localhost:8765/directions      -> {"command": "STOP"} when route completes
+  PUT  http://localhost:8765/directions      -> {"command": "STOP"} when route completes or RESET is received
 
 Behavior:
   - Waits until it reads "START" from /directions AND a non-empty /grid/path is available.
@@ -23,8 +23,7 @@ Behavior:
         • START heartbeat,
         • each waypoint arrival,
         • STOP command read from /directions.
-  - When the final waypoint is reached:
-        • Next loop iteration detects completion,
+  - When the final waypoint is reached OR "RESET" is read:
         • PUTs {"command": "STOP"} to /directions,
         • Resets internal state (no extra /current-values PUT on reset),
         • Returns to waiting for a new START.
@@ -257,6 +256,15 @@ class Simulator:
                 print(f"[{iso_now()}] Waiting for START and a non-empty /grid/path...")
                 while True:
                     dir_value = (await self.get_directions(session)).upper()
+
+                    # NEW: handle RESET during wait phase
+                    if dir_value == "RESET":
+                        print(f"[{iso_now()}] RESET received during wait — sending STOP and resetting state.")
+                        await self.put_directions_stop(session)
+                        self.reset_state()
+                        await asyncio.sleep(1.0)
+                        continue
+
                     await self.load_path_if_changed(session)
                     has_path = bool(self.path)
                     if dir_value == "START" and has_path:
@@ -284,7 +292,16 @@ class Simulator:
                 # ---- MOVEMENT PHASE ----
                 while True:
                     # Read command
-                    self.running = (await self.get_directions(session)) == "START"
+                    cmd = (await self.get_directions(session)).upper()
+
+                    # NEW: handle RESET during movement phase
+                    if cmd == "RESET":
+                        print(f"[{iso_now()}] RESET received during movement — sending STOP and resetting state.")
+                        await self.put_directions_stop(session)
+                        self.reset_state()
+                        break
+
+                    self.running = (cmd == "START")
 
                     # STOP edge -> PUT with isMoving=False, but do NOT reset here
                     if self.prev_running and not self.running:

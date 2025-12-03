@@ -3,22 +3,12 @@ import './App.css';
 import MessageWindow from './components/MessageWindow';
 import MapView from "./components/MapView";
 import Progress from "./components/Progress";
-import EmergencyStop from "./components/Stop";
-import StartCommand from "./components/Start";
 import StartStopButton from './components/StartStop';
 import IsMovingStatus from "./components/BotMoving";
-import ImportPathIcon from './components/ImportPathIcon';
 import PathControls from './components/PathControls';
 import ResetCurrentValues from './components/ResetCurrentValues';
 import CurrentValuesDisplay from './components/CurrentValuesDisplay';
 import { WebSocketProvider, WebsocketStatusIcon, useWebSocket } from "./components/Websocket";
-import {
-  PlayButtonIcon,
-  PauseButtonIcon,
-  WaypointIcon,
-  TargetIcon,
-  OnPathIcon,
-} from "./components/Icons";
 
 function AppContent({ messageBoxRef }) {
   const [isBotRunning, setIsBotRunning] = useState(false);
@@ -31,7 +21,7 @@ function AppContent({ messageBoxRef }) {
   const [isPathComplete, setIsPathComplete] = useState(false);
   
   // Refs for obstacle functions
-  const importObstaclesRef = useRef(null); // ADD THIS LINE
+  const importObstaclesRef = useRef(null);
   const exportObstaclesRef = useRef(null);
   const clearObstaclesRef = useRef(null);
   const revertObstaclesRef = useRef(null);
@@ -138,7 +128,7 @@ function AppContent({ messageBoxRef }) {
   };
   
   return (
-    <div>
+    <div className="app-root">
       <header className="header">
         <div className="icons">
           <div className="icon">
@@ -173,7 +163,7 @@ function AppContent({ messageBoxRef }) {
             hasUnsavedObstacleChanges={hasUnsavedObstacleChanges}
             onExportPath={handleExportPath}
             onClearPath={handleClearPath}
-            onImportObstacles={handleImportObstacles}  // ADD THIS LINE
+            onImportObstacles={handleImportObstacles}
             onExportObstacles={handleExportObstacles}
             onClearObstacles={handleClearObstacles}
             onRevertObstacles={handleRevertObstacles}
@@ -191,7 +181,7 @@ function AppContent({ messageBoxRef }) {
             messageBoxRef={messageBoxRef}
             mode={mode}
             setMode={setMode}
-            importObstaclesRef={importObstaclesRef}  // ADD THIS LINE
+            importObstaclesRef={importObstaclesRef}
             exportObstaclesRef={exportObstaclesRef}
             clearObstaclesRef={clearObstaclesRef}
             revertObstaclesRef={revertObstaclesRef}
@@ -241,6 +231,36 @@ function AppContent({ messageBoxRef }) {
 
 function App() {
   const messageBoxRef = useRef();
+
+  const baseSize = useRef({
+    width: window.innerWidth,
+    height: window.innerHeight
+  });
+
+  React.useEffect(() => {
+    const wrapper = document.querySelector('.app-root');
+    if (!wrapper) return;
+    
+    // Capture initial viewport size ONCE
+    const baseWidth = window.innerWidth;
+    const baseHeight = window.innerHeight;
+    
+    // Lock the app to these exact pixel dimensions
+    wrapper.style.width = `${baseWidth}px`;
+    wrapper.style.height = `${baseHeight}px`;
+
+    function scaleApp() {
+      const scaleX = window.innerWidth / baseWidth;
+      const scaleY = window.innerHeight / baseHeight;
+      wrapper.style.transform = `scaleX(${scaleX}) scaleY(${scaleY})`;
+    }
+
+    window.addEventListener('resize', scaleApp);
+    scaleApp();
+
+    return () => window.removeEventListener('resize', scaleApp);
+  }, []);
+
   return (
     <WebSocketProvider messageBoxRef={messageBoxRef}>
       <AppContent messageBoxRef={messageBoxRef} />

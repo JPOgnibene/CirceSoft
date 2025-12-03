@@ -1,0 +1,27 @@
+services:
+  backend:
+    build:
+      # Context must be the project root for access to Executables/
+      context: .
+      dockerfile: ./Backend/Dockerfile 
+    # Map host port 8000 to the container's internal port 8765 
+    # (as Uvicorn runs on 8765, even though the old port was 8000)
+    ports:
+      - "8000:8765"
+    restart: always
+
+  frontend:
+    # Frontend context stays in its own folder
+    build:
+      context: ./Frontend/react/my-app
+      dockerfile: Dockerfile
+    # Map host port 3000 to the container's internal port 5173 (Vite's default)
+    ports:
+      - "3000:5173"
+    volumes:
+      - ./Frontend/react/my-app:/app
+      - /app/node_modules
+    # The frontend only depends on the backend now
+    depends_on:
+      - backend
+    restart: always

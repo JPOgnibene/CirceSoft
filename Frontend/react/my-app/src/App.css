@@ -25,11 +25,8 @@ html, body {
   /* Header bar */
   .header {
     height: 70px;
-    background: linear-gradient(
-      to right,
-      #1a1d23 80%,
-      #cccccc 100%
-    );
+    background:
+      #1a1d23;
     border-bottom: 1px solid rgba(0, 255, 159, 0.15);
     color: white;
     display: flex;
@@ -37,42 +34,58 @@ html, body {
     padding: 0 20px;
   }
 
-  .header-title {
-  font-family: 'Courier New', monospace;
-  font-size: 1.8rem;
-  font-weight: 700;
-  font-style: italic;
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  color: #cccccc;
-  text-shadow: 0 0 20px rgba(0, 255, 159, 0.3);
-  position: relative;
-  padding-bottom: 8px;
-}
-
-.header-title::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 400px;
-  height: 2px;
-  background: linear-gradient(90deg, 
-    transparent 0%, 
-    #cccccc 20%, 
-    #cccccc 80%, 
-    transparent 100%
-  );
-  box-shadow: 0 0 8px rgba(0, 255, 159, 0.5);
-}
-
 .header-title-container {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
+}
+
+.header-title-container::before,
+.header-title-container::after {
+  content: '';
+  width: 200px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 255, 159, 0.6));
+}
+
+.header-title-container::after {
+  background: linear-gradient(90deg, rgba(0, 255, 159, 0.6), transparent);
+}
+
+.header-title {
+  font-family: 'Courier New', monospace;
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: 12px;
+  text-transform: uppercase;
+  color: #e0e0e0;
+  padding: 8px 20px;
+  border: 1px solid rgba(0, 255, 159, 0.4);
+  background: rgba(0, 255, 159, 0.05);
+  position: relative;
+  margin: 0 20px;
+}
+
+.header-title::before,
+.header-title::after {
+  content: '◆';
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #00ff9f;
+  font-size: 8px;
+  opacity: 0.8;
+}
+
+.header-title::before {
+  left: -30px;
+}
+
+.header-title::after {
+  right: -30px;
+  display: block;
 }
   
   /* Flex container for the two panes */
@@ -229,6 +242,7 @@ html, body {
     height: 60px;
     width: auto;
     margin-left: 16px;
+
   }
 
 
@@ -269,3 +283,4 @@ html, body {
       display: flex;
       align-items: stretch;   /* critical */
     }
+

@@ -188,15 +188,10 @@ const GridMap = ({
         if (messageBoxRef?.current) {
           messageBoxRef.current.addMessage('error', validation.message);
         }
-        console.warn(`⛔ Invalid click at (${r}, ${c}): ${validation.message}`);
+        console.warn(`Invalid click at (${r}, ${c}): ${validation.message}`);
         return;
       }
       
-      // Valid path click - notify parent component
-      console.log(`✅ Valid path click at (${r}, ${c})`);
-      if (messageBoxRef?.current) {
-        messageBoxRef.current.addMessage('success', `Path point selected at (${r}, ${c})`);
-      }
       
       // Call the parent's callback if provided
       if (onPathPointClick) {

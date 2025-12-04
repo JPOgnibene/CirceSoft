@@ -8,6 +8,7 @@ import IsMovingStatus from "./components/BotMoving";
 import PathControls from './components/PathControls';
 import ResetCurrentValues from './components/ResetCurrentValues';
 import CurrentValuesDisplay from './components/CurrentValuesDisplay';
+import InfoDropdown from './components/InfoDropdown';
 import { WebSocketProvider, WebsocketStatusIcon, useWebSocket } from "./components/Websocket";
 
 function AppContent({ messageBoxRef }) {
@@ -134,8 +135,8 @@ function AppContent({ messageBoxRef }) {
           <div className="icon">
             <WebsocketStatusIcon messageBoxRef={messageBoxRef} />
           </div>
-          <div className="clickIcon">
-            <IsMovingStatus messageBoxRef={messageBoxRef} />
+          <div className="icon">
+            <InfoDropdown />
           </div>
         </div>
         

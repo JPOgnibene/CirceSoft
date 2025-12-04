@@ -68,7 +68,7 @@ const ClickToPath = ({
           return distanceTraveled;
         }
         
-        const interpolationSpeed = Math.min(5, Math.abs(diff) * 2);
+        const interpolationSpeed = Math.min(2, Math.abs(diff) * .5);
         const step = diff * interpolationSpeed * deltaTime;
         
         return prev + step;
@@ -551,9 +551,19 @@ const ClickToPath = ({
                 <circle
                   cx={px}
                   cy={py}
-                  r={7}
-                  fill={draggedIndex === index ? "yellow" : "white"}
-                  stroke="black"
+                  r={6}
+                  fill={
+                    draggedIndex === index 
+                      ? "yellow" 
+                      : (mode !== "path" && index <= currentDot.index) 
+                        ? "#00ff9f" 
+                        : "white"
+                  }
+                  stroke={
+                    (mode !== "path" && index <= currentDot.index) 
+                      ? "#006644" 
+                      : "black"
+                  }
                   strokeWidth="2"
                   style={{
                     pointerEvents: mode === "path" ? "auto" : "none",

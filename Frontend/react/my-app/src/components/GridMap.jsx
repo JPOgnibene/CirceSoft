@@ -1,5 +1,100 @@
 import React, { useRef, useState, useEffect } from "react";
 
+// Add this right after your imports, before the GridMap component
+
+class ClosedAreaDetector {
+  constructor(maxRows, maxCols) {
+    this.maxRows = maxRows;
+    this.maxCols = maxCols;
+    this.obstacles = new Set();
+    this.unreachable = new Set();
+  }
+
+  setObstacles(obstacleArray) {
+    this.obstacles.clear();
+    obstacleArray.forEach(({r, c}) => {
+      this.obstacles.add(`${r},${c}`);
+    });
+  }
+
+  detectUnreachableAreas(startR, startC) {
+    const reachable = new Set();
+    const queue = [{r: startR, c: startC}];
+    const visited = new Set([`${startR},${startC}`]);
+
+    while (queue.length > 0) {
+      const {r, c} = queue.shift();
+      reachable.add(`${r},${c}`);
+
+      const directions = [
+        {dr: -1, dc: 0}, {dr: 0, dc: 1}, 
+        {dr: 1, dc: 0}, {dr: 0, dc: -1}
+      ];
+
+      for (const {dr, dc} of directions) {
+        const nr = r + dr;
+        const nc = c + dc;
+        const key = `${nr},${nc}`;
+        
+        if (nr < 0 || nr >= this.maxRows || nc < 0 || nc >= this.maxCols) continue;
+        if (visited.has(key) || this.obstacles.has(key)) continue;
+        
+        visited.add(key);
+        queue.push({r: nr, c: nc});
+      }
+    }
+
+    this.unreachable.clear();
+    for (let r = 0; r < this.maxRows; r++) {
+      for (let c = 0; c < this.maxCols; c++) {
+        const key = `${r},${c}`;
+        if (!this.obstacles.has(key) && !reachable.has(key)) {
+          this.unreachable.add(key);
+        }
+      }
+    }
+
+    return {
+      reachable: reachable.size,
+      unreachable: this.unreachable.size,
+      obstacles: this.obstacles.size
+    };
+  }
+
+  isUnreachable(r, c) {
+    return this.unreachable.has(`${r},${c}`);
+  }
+
+  validateClick(r, c) {
+    const key = `${r},${c}`;
+    
+    if (this.obstacles.has(key)) {
+      return {
+        valid: false,
+        reason: 'obstacle',
+        message: 'Cannot click on obstacle point'
+      };
+    }
+    
+    if (this.unreachable.has(key)) {
+      return {
+        valid: false,
+        reason: 'unreachable',
+        message: 'This area is unreachable (enclosed by obstacles)'
+      };
+    }
+    
+    return { valid: true };
+  }
+
+  getUnreachableCells() {
+    return Array.from(this.unreachable).map(key => {
+      const [r, c] = key.split(',').map(Number);
+      return {r, c};
+    });
+  }
+}
+
 const GridMap = ({ 
   mode, 
   gridBounds, 
@@ -25,6 +120,8 @@ const GridMap = ({
   const [lastObstaclePoint, setLastObstaclePoint] = useState(null);
   const imgRef = useRef(null);
   const svgRef = useRef(null);
+  const [detector, setDetector] = useState(null);
+  const [unreachableCells, setUnreachableCells] = useState([]);
   
   const GRID_ENDPOINT = "http://localhost:8765/grid/coordinates";
   const IMAGE_ENDPOINT = "http://localhost:8765/grid/image";
@@ -42,8 +139,60 @@ const GridMap = ({
         maxCols: Math.max(...gridData.map(p => p.c))
       };
       setGridBounds(bounds);
+      
+      // Create detector for closed area detection
+      const newDetector = new ClosedAreaDetector(
+        bounds.maxRows + 1,
+        bounds.maxCols + 1
+      );
+      setDetector(newDetector);
     }
   }, [gridData]);
+
+  // Auto-detect and fill unreachable areas whenever obstacles change
+  useEffect(() => {
+    if (detector && unsavedObstacles.length > 0) {
+      const startPosition = {r: 0, c: 0};
+      
+      detector.setObstacles(unsavedObstacles);
+      const stats = detector.detectUnreachableAreas(
+        startPosition.r, 
+        startPosition.c
+      );
+      
+      const unreachable = detector.getUnreachableCells();
+      
+      // Only proceed if there are new unreachable cells to add
+      if (unreachable.length > 0) {
+        console.log(`Found ${unreachable.length} unreachable cells - auto-filling`);
+        
+        setUnreachableCells(unreachable);
+        
+        const updatedObstacles = [...unsavedObstacles, ...unreachable];
+        setUnsavedObstacles(updatedObstacles);
+        setObstacles(updatedObstacles);
+        
+        // Send to backend
+        fetch(OBSTACLE_ENDPOINT, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedObstacles),
+        })
+          .then(response => response.json())
+          .then(result => {
+            if (messageBoxRef?.current) {
+              messageBoxRef.current.addMessage(
+                'success', 
+                `Auto-filled ${unreachable.length} enclosed cells`
+              );
+            }
+          })
+          .catch(error => {
+            console.error("Error updating obstacles:", error);
+          });
+      }
+    }
+  }, [unsavedObstacles, detector]);
 
   // Fetch grid data on startup
   useEffect(() => {
@@ -76,9 +225,17 @@ const GridMap = ({
     });
     return found;
   };
+  const isUnreachable = (r, c) => {
+    return detector?.isUnreachable(r, c) || false;
+  };
 
   // NEW: Validate if a point can be clicked for path mode
   const validatePathClick = (r, c) => {
+    if (detector) {
+      return detector.validateClick(r, c);
+    }
+    
+    // Fallback if detector isn't ready
     if (isObstacle(r, c)) {
       return {
         valid: false,
@@ -134,7 +291,46 @@ const GridMap = ({
     return polygons;
   };
 
+
+  const generateUnreachablePolygons = () => {
+    if (gridData.length === 0 || mode !== 'path') return [];
+    
+    const polygons = [];
+    const maxR = Math.max(...gridData.map(p => p.r));
+    const maxC = Math.max(...gridData.map(p => p.c));
+
+    for (let r = 0; r < maxR; r++) {
+      for (let c = 0; c < maxC; c++) {
+        const corners = [
+          { r, c, pos: getGridPointCoords(r, c) },
+          { r, c: c + 1, pos: getGridPointCoords(r, c + 1) },
+          { r: r + 1, c: c + 1, pos: getGridPointCoords(r + 1, c + 1) },
+          { r: r + 1, c, pos: getGridPointCoords(r + 1, c) }
+        ];
+
+        const unreachableCorners = corners.filter(
+          corner => corner.pos && isUnreachable(corner.r, corner.c)
+        );
+
+        if (unreachableCorners.length >= 3) {
+          const points = unreachableCorners
+            .map(corner => `${corner.pos.x},${corner.pos.y}`)
+            .join(' ');
+          
+          polygons.push({
+            key: `unreachable-poly-${r}-${c}`,
+            points,
+            cornerCount: unreachableCorners.length
+          });
+        }
+      }
+    }
+
+    return polygons;
+  };
+
   const obstaclePolygons = generateObstaclePolygons();
+  const unreachablePolygons = generateUnreachablePolygons();
 
   // Handle clicks on the SVG container
   const handleSvgClick = (e) => {
@@ -448,7 +644,20 @@ const GridMap = ({
             </g>
           );
         })()}
-        
+
+        {/* Draw unreachable regions (grayed out) */}
+        {unreachablePolygons.map(poly => (
+          <polygon
+            key={poly.key}
+            points={poly.points}
+            fill="rgba(60, 60, 60, 0.5)"
+            stroke="rgba(80, 80, 80, 0.7)"
+            strokeWidth="1"
+            strokeDasharray="4,4"
+            style={{ pointerEvents: "none" }}
+          />
+        ))}
+
         {/* Draw filled obstacle regions */}
         {obstaclePolygons.map(poly => (
           <polygon

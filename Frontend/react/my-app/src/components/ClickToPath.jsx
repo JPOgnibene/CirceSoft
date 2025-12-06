@@ -68,7 +68,7 @@ const ClickToPath = ({
           return distanceTraveled;
         }
         
-        const interpolationSpeed = Math.min(5, Math.abs(diff) * 2);
+        const interpolationSpeed = Math.min(2, Math.abs(diff) * .5);
         const step = diff * interpolationSpeed * deltaTime;
         
         return prev + step;
@@ -91,17 +91,17 @@ const ClickToPath = ({
   const PATH_ENDPOINT = "http://localhost:8765/grid/path";
   const WAYPOINT_ENDPOINT = "http://localhost:8765/waypoints";
   
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const resize = () => {
-      const rect = el.getBoundingClientRect();
-      setSize({ width: rect.width, height: rect.height });
-    };
-    resize();
-    window.addEventListener("resize", resize);
-    return () => window.removeEventListener("resize", resize);
-  }, []);
+  // useEffect(() => {
+  //   const el = containerRef.current;
+  //   if (!el) return;
+  //   const resize = () => {
+  //     const rect = el.getBoundingClientRect();
+  //     setSize({ width: rect.width, height: rect.height });
+  //   };
+  //   resize();
+  //   window.addEventListener("resize", resize);
+  //   return () => window.removeEventListener("resize", resize);
+  // }, []);
 
   const calculateDistance = (point1, point2) => {
     const dx = point2.x - point1.x;
@@ -387,18 +387,14 @@ const ClickToPath = ({
   };
 
   const graphToPixel = (dot) => {
-    const { width, height } = size;
-    
     if (!gridBounds) {
-      return { px: width / 2, py: height / 2 };
+      return { px: imgDimensions.width / 2, py: imgDimensions.height / 2 };
     }
     
     const imgX = gridBounds.minPX + (dot.x / gridBounds.maxCols) * (gridBounds.maxPX - gridBounds.minPX);
     const imgY = gridBounds.minPY + (dot.y / gridBounds.maxRows) * (gridBounds.maxPY - gridBounds.minPY);
     
-    const px = (imgX / imgDimensions.width) * width;
-    const py = ((imgDimensions.height - imgY) / imgDimensions.height) * height;
-    return { px, py };
+    return { px: imgX, py: imgDimensions.height - imgY };
   };
 
   const getPositionFromDistance = () => {
@@ -491,6 +487,7 @@ const ClickToPath = ({
         />
         
         <svg
+          viewBox={`0 0 ${imgDimensions.width} ${imgDimensions.height}`}
           style={{
             position: "absolute",
             top: 0,
@@ -544,67 +541,88 @@ const ClickToPath = ({
               )}
             </>
           )}
+
+          {/* NEW: Waypoint circles inside SVG */}
+          {path.map((dot, index) => {
+            const { px, py } = graphToPixel(dot);
+            return (
+              <g key={index}>
+                {/* Main waypoint circle */}
+                <circle
+                  cx={px}
+                  cy={py}
+                  r={6}
+                  fill={
+                    draggedIndex === index 
+                      ? "yellow" 
+                      : (mode !== "path" && index <= currentDot.index) 
+                        ? "#00ff9f" 
+                        : "white"
+                  }
+                  stroke={
+                    (mode !== "path" && index <= currentDot.index) 
+                      ? "#006644" 
+                      : "black"
+                  }
+                  strokeWidth="2"
+                  style={{
+                    pointerEvents: mode === "path" ? "auto" : "none",
+                    cursor: mode === "path" ? "move" : "default",
+                  }}
+                  onMouseDown={(e) => handlePointMouseDown(e, index)}
+                />
+                
+                {/* Delete button */}
+                {mode === "path" && !isDragging && (
+                  <g
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deletePoint(index);
+                    }}
+                    style={{ cursor: "pointer", pointerEvents: "auto" }}
+                  >
+                    <circle
+                      cx={px + 10}
+                      cy={py - 10}
+                      r={6}
+                      fill="red"
+                      stroke="black"
+                      strokeWidth="1"
+                    />
+                    <text
+                      x={px + 10}
+                      y={py - 6}
+                      textAnchor="middle"
+                      fill="white"
+                      fontSize="10"
+                      fontWeight="bold"
+                      style={{ pointerEvents: "none" }}
+                    >
+                      ×
+                    </text>
+                  </g>
+                )}
+              </g>
+            );
+          })}
+          <image
+            href="/contents/images/circe.png"
+            x={px - 16}
+            y={py - 16}
+            width={32}
+            height={32}
+            style={{
+              pointerEvents: "none",
+              filter: isMoving 
+                ? "drop-shadow(0 0 8px rgba(0, 255, 157, 1)) drop-shadow(0 0 16px rgba(0, 255, 159, 0.4))" 
+                : "grayscale(0.5) drop-shadow(0 0 6px rgba(255, 81, 0, 1))",
+            }}
+          />
         </svg>
         
-        {path.map((dot, index) => {
-          const { px, py } = graphToPixel(dot);
-          return (
-            <div
-              key={index}
-              style={{
-                position: "absolute",
-                left: px - 8,
-                top: py - 8,
-                pointerEvents: mode === "path" ? "auto" : "none",
-              }}
-            >
-              <div
-                onMouseDown={(e) => handlePointMouseDown(e, index)}
-                style={{
-                  width: 14,
-                  height: 14,
-                  borderRadius: "50%",
-                  backgroundColor: draggedIndex === index ? "yellow" : "white",
-                  border: "2px solid black",
-                  cursor: mode === "path" ? "move" : "default",
-                  position: "relative",
-                }}
-              />
-              
-              {mode === "path" && !isDragging && (
-                <div
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deletePoint(index);
-                  }}
-                  style={{
-                    position: "absolute",
-                    top: -8,
-                    right: -8,
-                    width: 13,
-                    height: 12,
-                    borderRadius: "50%",
-                    backgroundColor: "red",
-                    color: "white",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "10px",
-                    fontWeight: "bold",
-                    cursor: "pointer",
-                    border: "1px solid black",
-                    userSelect: "none",
-                  }}
-                  title="Delete waypoint"
-                >
-                  ×
-                </div>
-              )}
-            </div>
-          );
-        })}
         
-        <img
+        
+        {/* <img
           src="/contents/images/circe.png"
           alt="moving"
           style={{
@@ -619,7 +637,7 @@ const ClickToPath = ({
               : "grayscale(0.5) drop-shadow(0 0 6px rgba(255, 81, 0, 1))",
             transition: "filter 0.3s ease-in-out",
           }}
-        />
+        /> */}
       </div>
     </div>
   );

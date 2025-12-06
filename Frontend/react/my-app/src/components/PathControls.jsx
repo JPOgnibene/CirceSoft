@@ -44,7 +44,7 @@ const PathControls = ({
       if (messageBoxRef?.current) {
         messageBoxRef.current.addMessage(
           'warning',
-          '⏱ Timeout: No path update received. Please try importing manually.'
+          'Timeout: No path update received. Please try importing manually.'
         );
       }
     }, 10000);
@@ -63,7 +63,7 @@ const PathControls = ({
         if (messageBoxRef?.current) {
           messageBoxRef.current.addMessage(
             'success',
-            '✓ Path endpoint updated! Importing path...'
+            'Path endpoint updated! Importing path...'
           );
         }
 
@@ -197,7 +197,7 @@ const PathControls = ({
       if (pathSuccess) {
         setWaitingForPathUpdate(true);
         if (messageBoxRef?.current) {
-          messageBoxRef.current.addMessage('info', '⏳ Waiting for path endpoint update...');
+          messageBoxRef.current.addMessage('info', 'Waiting for path endpoint update...');
         }
       }
       

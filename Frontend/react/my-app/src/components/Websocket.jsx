@@ -281,11 +281,11 @@ export const WebSocketProvider = ({ children, messageBoxRef }) => {
 };
 
 // WebSocket Status Icon Component
+// WebSocket Status Icon Component
 export const WebsocketStatusIcon = ({ messageBoxRef }) => {
   const ws = useWebSocket();
   const [isConnected, setIsConnected] = useState(false);
 
-  // Update local state when WebSocket connection changes
   useEffect(() => {
     if (ws) {
       setIsConnected(ws.isConnected);
@@ -308,17 +308,135 @@ export const WebsocketStatusIcon = ({ messageBoxRef }) => {
   };
 
   return (
-    <img
-      id="toggleImage"
-      src={
-        isConnected
-          ? '/contents/images/websocket_connection_on.png'
-          : '/contents/images/websocket_connection_off.png'
-      }
-      alt="Websocket Status"
+    <div
       onClick={handleClick}
-      style={{ cursor: 'pointer' }}
+      style={{
+        width: 44,
+        height: 44,
+        borderRadius: '50%',
+        // backgroundColor: 'rgba(0, 0, 0, 0.3)',
+        // border: `2px solid ${isConnected ? '#00ff9f' : '#ff4757'}`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        transition: 'all 0.3s ease',
+        position: 'relative',
+        boxShadow: isConnected 
+          ? '0 0 12px rgba(0, 255, 159, 0.4), inset 0 0 8px rgba(0, 255, 159, 0.1)' 
+          : '0 0 12px rgba(255, 71, 87, 0.3), inset 0 0 8px rgba(255, 71, 87, 0.1)',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = 'scale(1.05)';
+        e.currentTarget.style.boxShadow = isConnected
+          ? '0 0 20px rgba(0, 255, 159, 0.6), inset 0 0 12px rgba(0, 255, 159, 0.2)'
+          : '0 0 20px rgba(255, 71, 87, 0.5), inset 0 0 12px rgba(255, 71, 87, 0.2)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'scale(1)';
+        e.currentTarget.style.boxShadow = isConnected
+          ? '0 0 12px rgba(0, 255, 159, 0.4), inset 0 0 8px rgba(0, 255, 159, 0.1)'
+          : '0 0 12px rgba(255, 71, 87, 0.3), inset 0 0 8px rgba(255, 71, 87, 0.1)';
+      }}
       title={isConnected ? 'Connected - Click to disconnect' : 'Disconnected - Click to connect'}
-    />
+    >
+      {/* Signal waves */}
+      <svg
+        width="28"
+        height="28"
+        viewBox="0 0 24 24"
+        fill="none"
+        style={{ position: 'relative', zIndex: 1 }}
+      >
+        {/* Center dot */}
+        <circle
+          cx="12"
+          cy="18"
+          r="2.5"
+          fill={isConnected ? '#00ff9f' : '#ff4757'}
+          style={{
+            filter: isConnected 
+              ? 'drop-shadow(0 0 4px rgba(0, 255, 159, 0.8))' 
+              : 'drop-shadow(0 0 4px rgba(255, 71, 87, 0.8))',
+          }}
+        />
+        
+        {/* Inner arc */}
+        <path
+          d="M8.5 14.5C9.5 13.5 10.7 13 12 13C13.3 13 14.5 13.5 15.5 14.5"
+          stroke={isConnected ? '#00ff9f' : '#ff4757'}
+          strokeWidth="2"
+          strokeLinecap="round"
+          fill="none"
+          style={{
+            opacity: isConnected ? 1 : 0.4,
+            filter: isConnected ? 'drop-shadow(0 0 3px rgba(0, 255, 159, 0.6))' : 'none',
+            transition: 'opacity 0.3s ease',
+          }}
+        />
+        
+        {/* Middle arc */}
+        <path
+          d="M5.5 11C7.3 9.2 9.5 8 12 8C14.5 8 16.7 9.2 18.5 11"
+          stroke={isConnected ? '#00ff9f' : '#ff4757'}
+          strokeWidth="2"
+          strokeLinecap="round"
+          fill="none"
+          style={{
+            opacity: isConnected ? 1 : 0.25,
+            filter: isConnected ? 'drop-shadow(0 0 3px rgba(0, 255, 159, 0.5))' : 'none',
+            transition: 'opacity 0.3s ease',
+          }}
+        />
+        
+        {/* Outer arc */}
+        <path
+          d="M2.5 7.5C5.3 4.7 8.5 3 12 3C15.5 3 18.7 4.7 21.5 7.5"
+          stroke={isConnected ? '#00ff9f' : '#ff4757'}
+          strokeWidth="2"
+          strokeLinecap="round"
+          fill="none"
+          style={{
+            opacity: isConnected ? 1 : 0.15,
+            filter: isConnected ? 'drop-shadow(0 0 3px rgba(0, 255, 159, 0.4))' : 'none',
+            transition: 'opacity 0.3s ease',
+          }}
+        />
+      </svg>
+
+      {/* Pulse animation when connected */}
+      {isConnected && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: 40,
+            height: 40,
+            borderRadius: '50%',
+            border: '1px solid rgba(0, 255, 159, 1)',
+            animation: 'wsPulse 2s ease-out infinite',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+
+      {/* Keyframes style tag */}
+      <style>
+        {`
+          @keyframes wsPulse {
+            0% {
+              transform: translate(-50%, -50%) scale(1);
+              opacity: 0.6;
+            }
+            100% {
+              transform: translate(-50%, -50%) scale(1.4);
+              opacity: 0;
+            }
+          }
+        `}
+      </style>
+    </div>
   );
 };
